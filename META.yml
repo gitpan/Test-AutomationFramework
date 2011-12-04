@@ -1,0 +1,26 @@
+--- #YAML:1.0
+name:               Test-AutomationFramework
+version:            0.01
+abstract:           ~
+author:
+    - Yong Wang <ywangperl@gmail.com>
+license:            unknown
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  0
+build_requires:
+    ExtUtils::MakeMaker:  0
+requires:
+    Date::Manip:   6.23
+    File::Copy:    2.18
+    File::Path:    2.0801
+    Getopt::Long:  2.38
+    Test::More:    0.96
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.57_05
+meta-spec:
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4

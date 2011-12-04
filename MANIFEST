@@ -1,0 +1,7 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/Test-AutomationFramework.t
+lib/Test/AutomationFramework.pm
+META.yml                                 Module meta-data (added by MakeMaker)
