@@ -1,4 +1,4 @@
-package Test::AutomationFramework 0.01; 
+package Test::AutomationFramework; 
 use 5.012003;
 use strict;
 use warnings;
@@ -16,38 +16,39 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
 help
-processTCSettings
+processTCs
 processTC
 processProperty
 );
 
-our $VERSION = '0.06';   # processTC(;;;;;;listVars;execAll) , processTC, processProp done
 
-	my $propertyOp='';	my $regression=0; my $help=0;
+our $VERSION = '0.02';   
+	my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 4;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g;
 	my $tcNamePattern	= "TC*";
 	my $reportHtml  	= 'index.htm';
 	my $reportHtml1 	= '_tcReport_.html';
 	my $reportHistoryHtml 	= '_tcReportHistory_.html';
 	my $SvrDrive = 'c:'; 
-	my $SvrProjName = '_testProj_'; 
-	my $SvrTCName = '_SvrTCName_';
-	my $SvrTCNamePattern = "test*"; 
+	my $SvrProjName = '_testSuit_'; 
+	my $SvrTCName = '_testCase_';
+	my $SvrTCNamePattern = "*"; 
 	my $SvrPropNamePattern = '.*';
 	my $SvrPropValuePattern = ".*";
-	my $SvrTCNameExecPattern = $SvrTCNamePattern;
-	my $tcOp= 'exec';	
+	my $SvrTCNameExecPattern = ".".$SvrTCNamePattern;
+	my $tcOp= 'list';	
  	my $pr2Screen = 1;
 	my $SvrLogDir = ''.$SvrProjName.'';
+
 
 sub new { my $package = shift;
 	return bless({}, $package);
 }
 
 sub tcLoop {
-	if ($pr2Screen == 1) {print "Processing ......" ; } else { print "";}
+	if ($pr2Screen == 1) {print "Processing ......\n" ; } else { print "";}
 	&tcPre(); my $returnValue = &tcMain(); &tcPost(); 
-	if ($pr2Screen==1) {print "\n - Completed -\n"; } else { print "";}
+	if ($pr2Screen==1) {print " - Completed -"; } else { print "";}
 	return $returnValue;
 }
 sub tcPre {
@@ -64,11 +65,11 @@ sub tcMain {
 
 		if ( &matchProperty ($SvrPropNamePattern, $SvrPropValuePattern, $eachTC) =~ /true/i) {	# Property Filter
 				$eachTC = &getRoot($eachTC);
-			if ($propertyOp !~ /^\s*$/) { printf "%20s\n", &processProperty($eachTC, $propertyOp); 
-			}  # PropertyManagement
+			if ($propertyOp !~ /^\s*$/) { printf "%20s\n", &processProperty($eachTC, $propertyOp); }  # PropertyManagement
 			elsif (($tcOp !~ /^\s*$/)&&(&getRoot($eachTC)=~/$SvrTCNameExecPattern/))  { 
 				&updateWeb($eachTC,1);
 				$returnValue = $returnValue. &processTC("","$tcOp=$eachTC",$pr2Screen);   	  # TC Execution
+				sleep $sleep4Display;
 				&updateWeb($eachTC,0);
 		    	}
  			&logTC($eachTC);						# TC Logging
@@ -89,22 +90,26 @@ sub tcPost {
 } 
 
 sub updateWeb {
- 	my $tcname = 'TC_tc1'; $tcname = shift if @_;
+ 	my $tcname = 'TC_tc1'; $tcname = shift if @_;	
  	my $scrollamount = 0 ; $scrollamount = shift if @_;
 	$tcname = &getTCName($tcname); $tcname =~ s/\\/\//g;
 	if (-e $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml) {
 		open Fin, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml;
 		open Fout, ">".$SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml."_";
 		while ($_ = <Fin>) {
-		if ( $_ =~ /$tcname\b/i) {
-			$_ =~ /scrollamount=\s*(\d+)\s*/;
-			$_ =~ s/scrollamount=\s*$1\s*/scrollamount=$scrollamount/;
-			print Fout $_;} else { print Fout $_; }
+			my $tcnameTmp = $tcname;
+			$tcnameTmp =~ s/\//\\\\/g; 
+			if ( $_ =~ /$tcnameTmp/i) {
+				$_ =~ /scrollamount=\s*(\d+)\s*/;
+				$_ =~ s/scrollamount=\s*$1\s*/scrollamount=$scrollamount/;
+				print Fout $_;} else { print Fout $_; 
+			}
 		}
 		close Fin;
 		close Fout;
-		copy ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml."_", $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml);
+		move ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml."_", $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml);
 	}
+	return "tcCtr_Dynamics=$scrollamount";
 }
 
 ################################################################################
@@ -154,7 +159,7 @@ sub logTC {		# 	Update TC Log on webUI (TH:WebUI)
          	print Fout "</pre></body></html>\n";
          	close Fout;
 	 } 
-	 return "$tcname";
+	 return " tcLog[Append].[txt|html] are refreshed";
 }
 
 ################################################################################
@@ -296,7 +301,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 	my $dirRoot = &getRoot($tcname); 
 	my $TCCtrToolTip = sprintf "Click to exec TC (Avg Response Time %.2fs)", $avgResponseTime; 
 	my $TCScrollAmount = 0; my $CtrSeparator = "|";
-	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"file:\\\\\\$tcname/_tcLog.html\" title=\"Click to see TC Logs\"> %-40s</a> <a href=\"file:///$SvrDrive/$SvrProjName/${reportHistoryHtml}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$scriptName -drive $SvrDrive -projName $SvrProjName -tcNamePatternExec $dirRoot\\\\b')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee width=48 direction=right behavior=alternate loop=10000 scrollamount=$TCScrollAmount>%-5d</marquee></a></font> AvgRespTime: %-10.2f     <font color=\"black\"> TimeSpan: %20s -- %20s       %s </font></span></li>\n",
+	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"file:\\\\\\$tcname\\_tcLog.html\" title=\"Click to see TC Logs\"> %-40s</a> <a href=\"file:///$SvrDrive/$SvrProjName/${reportHistoryHtml}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$scriptName -s drive=c:;ts=$SvrProjName;tne=$dirRoot;op=exec')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee width=48 direction=right behavior=alternate loop=10000 scrollamount=$TCScrollAmount>%-5d</marquee></a></font> AvgRespTime: %-10.2f     <font color=\"black\"> TimeSpan: %20s -- %20s       %s </font></span></li>\n",
                     $tcname,
                     $passCtr,
                     $failCtr,
@@ -311,6 +316,53 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
      	return $returnValue;
 }
 
+sub processTCs{
+	shift;
+	my $isBatchProcessing = 1;
+	@_ = split /;/, shift;
+	foreach my $each (@_) {
+		if ((($each =~ /listVars/i) || ($each =~ /getVars/i))&& ($each !~ /=/)) { return &getGlobalVars();} 
+		if (($each =~ /printVars/i) && ($each !~ /=/)) { print &getGlobalVars(); return 1;} 
+		$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/;
+		my $varName = $1; my $varValue = $2;
+		if (($varName) || ($varValue)) { ; } else { &tcLoop(); return 'processTCSettnigs is invalid format';}
+		if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
+			if ($varName =~ /Drive/i) 		{ $SvrDrive = $varValue; }
+			elsif ($varName =~ /ProjName/i) 		{ $SvrProjName = $varValue; }
+			elsif ($varName =~ /TCName|testcase\b/i) 		{ $SvrTCName = $varValue; }
+			elsif ($varName =~ /TCNamePattern\b/i) 	{ $SvrTCNamePattern = $varValue; }
+			elsif ($varName =~ /TCNameExecPattern/i) 	{ $SvrTCNameExecPattern = $varValue; }
+			elsif ($varName =~ /tcOp/i) 		{ $tcOp= $varValue; }
+			elsif ($varName =~ /PropNamePattern/i)  	{ $SvrPropNamePattern= $varValue; }
+			elsif ($varName =~ /PropValuePattern/i)  	{ $SvrPropValuePattern= $varValue; }
+
+			elsif ($varName =~ /TestSuit/i) 		{ $SvrProjName = $varValue; }
+			elsif ($varName =~ /TCNameFilter\b/i) 	{ $SvrTCNamePattern = $varValue; }
+			elsif ($varName =~ /TCNameExecFilter/i) 	{ $SvrTCNameExecPattern = $varValue; }
+			elsif ($varName =~ /PropNameFilter/i)  	{ $SvrPropNamePattern= $varValue; }
+			elsif ($varName =~ /PropValueFilter/i)  	{ $SvrPropValuePattern= $varValue; }
+
+			elsif ($varName =~ /\btsuit\b/i) 		{ $SvrProjName = $varValue; }
+			elsif ($varName =~ /\btname\b/i) 	{ $SvrTCNamePattern = $varValue; }
+			elsif ($varName =~ /\bpname\b/i)  	{ $SvrPropNamePattern= $varValue; }
+			elsif ($varName =~ /\bpvalue\b/i)  	{ $SvrPropValuePattern= $varValue; }
+			elsif ($varName =~ /top/i) 		{ $tcOp= $varValue; }
+
+			elsif ($varName =~ /\bts\b/i) 		{ $SvrProjName = $varValue; }
+			elsif ($varName =~ /\btn\b/i) 	{ $SvrTCNamePattern = $varValue; }
+			elsif ($varName =~ /\btc\b/i) 	{ $SvrTCNamePattern = $varValue; }
+			elsif ($varName =~ /\btne\b/i) 	{ $SvrTCNameExecPattern = $varValue; }
+			elsif ($varName =~ /\bop\b/i) 		{ $tcOp= $varValue; }
+
+			elsif ($varName =~ /pr2Screen/i)  { $pr2Screen= $varValue; }
+			else {
+				$isBatchProcessing = 0;
+				&processTC("",$each);  
+			}
+	 	}
+	}
+	if ($isBatchProcessing == 1) {&tcLoop();}
+}
 
 ################################################################################
 #	Subroutine Name : process Test Case
@@ -322,64 +374,43 @@ sub processTC {
 	    my $tcOP = ''; my $tcname; my $cmd="";
 	    shift; $tcOP= shift; 
 	    my $prMsg = '' ; $prMsg= shift if @_;
-
-	    $tcOP =~ /\s*([\w|\d]+)\s*(=)?\s*(\w+)?\s*(;)?(\s*\S+\s*)?/;  
+	    $tcOP =~ /\s*([\w|\d]+)\s*(=)?\s*(\w+)?\s*([;|\/])?(\s*\S+\s*)?/;  
 	    $tcOP = $1; $tcname = $3; $cmd = $5;
-	    #   if (($cmd) && ($cmd =~ /pr2Screen\s*=\s*1/)){ $prMsg = 1;}
-	$prMsg = $pr2Screen;
+	    $prMsg = $pr2Screen;
 	    $tcname =  &getTCName($tcname); 
 	    my $rst; 
 	    if ( $tcOP =~ /^\s*create/i ) {
 		    if ($cmd) { $rst = &createTC("cmd=$cmd",$tcname); }
 		    else { $rst = &createTC($tcname); }
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, $rst if $prMsg;
-		    $rst = sprintf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, $rst;
-		    return $rst;
-            }
-            elsif ( $tcOP =~ /^\s*exec\b/i ) {
+            } elsif ( $tcOP =~ /^\s*exec\b/i ) {
 		    $rst = &execTC($tcname);
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst if $prMsg;
-		    $rst = sprintf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst ;
-		    return $rst;
-            }
-            elsif ( $tcOP =~ /^\s*execAll/i ) {
+            } elsif ( $tcOP =~ /^\s*execAll/i ) {
 		    $rst = &tcLoop();
-		    return $rst;
-            }
-            elsif ( $tcOP =~ /^\s*log/i ) {
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  &logTC($tcname) if $prMsg;
-		    &logTC($tcname);
-            }
-            elsif ( $tcOP =~ /^\s*detect/i ) {
+		        return $rst;
+            } elsif ( $tcOP =~ /^\s*UpdateWeb/i ) {
+		    if (defined $cmd) {;} else { $cmd = 0;}
+		    $rst = &updateWeb($tcname,$cmd);
+            } elsif ( $tcOP =~ /^\s*log/i ) {
+		    $rst = &logTC($tcname);
+            } elsif ( $tcOP =~ /^\s*detect/i ) {
 		    $rst = &detectTC($tcname, $SvrProjName, $SvrDrive); 
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, $rst if $prMsg; 
-		    $rst = sprintf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst ;
-		    return $rst;
-            }
-            elsif ( $tcOP =~ /^\s*getLogName/i ) {
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, &getTCLogFname(&getTCName($tcname)) if $prMsg; 
-		    return &getTCLogFname(&getTCName($tcname)); 
+            } elsif ( $tcOP =~ /^\s*getLogName/i ) {
+		    $rst = &getTCLogFname(&getTCName($tcname)); 
 	    } elsif ( $tcOP =~ /^\s*list|get/i ) {
 		    $rst = &getProperties(&getTCName($tcname) , 'tcRunResult', 'latest');
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst if $prMsg; 
-		    $rst = sprintf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst ;
-		    return $rst;
-            }
-            elsif ( $tcOP =~ /^\s*reportTCResult/i ) {
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, &reportTC($tcname,"","lastValue") ;
-            }
-            elsif ( $tcOP =~ /^\s*reportTCHistory/i ) {
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, &reportTCHistory($tcname);
-            }
-            elsif ( $tcOP =~ /^\s*delete/i ) {
+            } elsif ( $tcOP =~ /^\s*printResult/i ) {
+		    if (defined $cmd) { $rst =  &reportTCHistory($tcname); }
+			else { $rst = &reportTC($tcname,"","lastValue") ;}
+            } elsif ( $tcOP =~ /^\s*delete/i ) {
 		    $tcOP =~ s/^\s*delete\s*=//g;
 		    $tcOP =~ s/\s*$//g;
 		    $rst = &deleteTC($tcname);
-		    printf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname, $rst if $prMsg; 
-		    $rst = sprintf "\n%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst ;
-		    return $rst;
-            }
-	    1;
+            } else {
+		return "_noProcessedTC_";
+	    }
+	     	printf "%20s:%30s %s\n", "processTC ($tcOP)", $tcname, $rst  if $prMsg; 
+	 	$rst = sprintf "%20s:%30s %s", "processTC ($tcOP)", $tcname,  $rst ;
+		return $rst;
 }
 
 sub createTC {
@@ -387,13 +418,14 @@ sub createTC {
 	$cmd = shift; if ($cmd !~ /^\s*cmd\s*=/i) { unshift @_, $cmd; } ;
 	my $tcNameRoot = "@_";
 	my $tcName = &getTCName(@_);
-	if( &detectTC($tcName) && ($cmd !~ /Overwrite/i)) {
+	if( &detectTC($tcName) =~ /exists/ && ($cmd !~ /Over/i)) { # overwrite
+	return "Warning $tcName already exist! (-create;cmd=overwrite)" ;
 		;} else 
 	{
 		mkpath($tcName);
-		if ($cmd =~ /PerformanceTC/i) { 
+		if ($cmd =~ /Perf/i) {  # PerformanceTC
 		&createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"1234567.89\\n\"; sleep 3; ");
-		} elsif ($cmd =~ /FailedTC/i) {
+		} elsif ($cmd =~ /Fail/i) { # FailedTC
 		&createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"fail\\n\"; sleep 3; ");
 		} else {
 		&createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"pass\\n\"; sleep 3; ");
@@ -415,12 +447,13 @@ $tcName =~ s/\\/\\\\/g;
 
 
 EOF
-$tcName =~ s/\\\\/\\/g;
-		&createFile( $tcName.'\\'.'tc_.pl', $tmp);
 
+$tcName =~ s/\\\\/\\/g;
+#		&createFile( $tcName.'\\'.'tc_.pl', $tmp);
 		#}
+		# return "$tcName is created";
+	return "is created";
 	}
-	return "$tcName is created";
 }
 
 
@@ -451,8 +484,9 @@ sub deleteTC {
 	if ($_[1]) { $SvrProjName = $_[1];}
 	if ($_[2]) { $SvrDrive = $_[2];}
 	my $tcName = &getTCName(@_);
-	rmtree $tcName;
-	return "$tcName is deleted";
+	move ($tcName, $tcName."_".  &UnixDate( "now", "%m_%d_%Y_%H_%M_%S_%Z" ) ."_backup");
+	# rmtree $tcName;
+	return "$tcName is deleted (saved as *_backup)";
 }
 
 sub detectTC {
@@ -460,15 +494,16 @@ sub detectTC {
 	if ($_[2]) { $SvrDrive = $_[2];}
 	my $tcName = '';
 	$tcName = &getTCName(@_);
-     	if (-e  $tcName) { return  -e $tcName; } else { return '';}
+	# if (-e  $tcName ) { return  -e "$tcName\\tc.pl"; } else { return '';}
+     	if (-e "$tcName\\tc.pl" ) { return  "exists"; } else { return 'does not exist';}
 }
 
 sub getTCName {
-	my $SvrProjNameTmp; my $SvrDriveTmp;
-	my $SvrTCNameTmp ;  $SvrTCNameTmp = shift if @_; 
-			if ($SvrTCNameTmp) {;} else { $SvrTCNameTmp = $SvrTCName; }  
-			if ($SvrProjNameTmp) {;} else {  $SvrProjNameTmp = $SvrProjName;}  
-			if ($SvrDriveTmp) {;} else {  $SvrDriveTmp = $SvrDrive;}  
+	my $SvrProjNameTmp; my $SvrDriveTmp; my $SvrTCNameTmp ;  
+		$SvrTCNameTmp = shift if @_; 
+		if ($SvrTCNameTmp) {;} else { $SvrTCNameTmp = $SvrTCName; }  
+		if ($SvrProjNameTmp) {;} else {  $SvrProjNameTmp = $SvrProjName;}  
+		if ($SvrDriveTmp) {;} else {  $SvrDriveTmp = $SvrDrive;}  
 	if ($SvrTCNameTmp =~ /$SvrDrive/i) {
 		return  $SvrTCNameTmp;
 	} else {
@@ -499,47 +534,44 @@ sub tcAvgResponseTime { # absolete
 #	Output/Returns  : tcName and propertyOp
 ################################################################################
 sub processProperty {
-	    shift; my $tcname = shift; my $propertyOP = shift; my $rst=""; my $prMsg=0;
-	    # print "pass ProcessProperty. c.perl.site.lib.test\n";
-		if  ($tcname =~ /:|;/) { $propertyOP = $tcname; $tcname=&getTCName();}
-		if ($propertyOP =~ /;\s*pr2Screen\s*=\s*\d+/) {
-		$propertyOP =~ /;\s*pr2Screen\s*=\s*(\d+)\s*/; $prMsg = $1;
-		$propertyOP =~ s/;\s*pr2Screen\s*=\s*(\d+)\s*//;
-		}
-
-	    if ( $propertyOP =~ /^\s*add/i ) {
-                &addProperty( &getTCName($tcname), $propertyOP );
-            }
-            elsif ( $propertyOP =~ /^\s*del/i ) {
-                &deleteProperty( &getTCName($tcname), $propertyOP );
-            }
-            elsif ( $propertyOP =~ /^\s*reset/i ) {
+	shift; my $tcname = shift; my $propertyOP = shift; my $rst=""; my $prMsg=0;
+	if  ($tcname =~ /:|;/) { $propertyOP = $tcname; $tcname=&getTCName();}
+	if (defined $propertyOP) {;} else { $rst = "Warning: wrong format. Correct format is -add=prop:value"; 
+		return $rst; }
+	if ($propertyOP =~ /;\s*pr2Screen\s*/) { $prMsg = 1; $propertyOP =~ s/;\s*pr2Screen\s*//; }
+	if ( $propertyOP =~ /^\s*add/i ) {
+                $rst = &addProperty( &getTCName($tcname), $propertyOP );
+        }
+        elsif ( $propertyOP =~ /^\s*del/i ) {
+                $rst = &deleteProperty( &getTCName($tcname), $propertyOP );
+        }
+        elsif ( $propertyOP =~ /^\s*reset/i ) {
                 ;
-            }    # copy to a backup and create a property file
-            elsif ( $propertyOP =~ /^\s*modify/i ) {
-                &modifyProperty( &getTCName($tcname), $propertyOP );
-            }
-            elsif ( $propertyOP =~ /^\s*get|list/i ) {
+        }    # copy to a backup and create a property file
+        elsif ( $propertyOP =~ /^\s*modify/i ) {
+                $rst = &modifyProperty( &getTCName($tcname), $propertyOP );
+        }
+        elsif ( $propertyOP =~ /^\s*get|list/i ) {
 		    $propertyOP =~ s/^\s*get\s*=//g; $propertyOP =~ s/^\s*list\s*=//g;
-		    if ($propertyOP =~ /;/ ) {
-			    @_ = split /;/, $propertyOP ;
-			    $rst = &getProperties(&getTCName($tcname), $_[0], $_[1]);
+		if ($propertyOP =~ /;/ ) {
+		    @_ = split /;/, $propertyOP ;
+		    $rst = &getProperties(&getTCName($tcname), $_[0], $_[1]);
 	    	    } else {
 			    $rst = &getProperties(&getTCName($tcname), $propertyOP );
-		    }
-            }
-            elsif ( $propertyOP =~ /^\s*create/i ) {
-        	&createPropertyTemplate($tcname);
-            }
-            elsif ( $propertyOP =~ /^\s*match|filter/i ) {
+		 }
+         }
+         elsif ( $propertyOP =~ /^\s*create/i ) {
+        	$rst = &createPropertyTemplate($tcname);
+         }
+         elsif ( $propertyOP =~ /^\s*match|filter/i ) {
 		    $propertyOP =~ s/^\s*match\s*=//g;
-		    $propertyOP =~ /\s*(\S)\s*[:|;]\s*(\S)\s*/; 
+		    $propertyOP =~ /\s*(\S+)\s*[:|;]\s*(\S+)\s*/; 
         	    $rst = &matchProperty($1, $2, $tcname);
-            } else {
-	    	    $rst = sprintf "ProcessProperty (no match) %40s %20s", $tcname, $propertyOp;
-    	    }
-	    if ($rst =~ /^\s*$/) { $rst = "_noMatch_";}
-	    if ($prMsg != 0) { print $rst;}
+         } else {
+	    	    $rst = sprintf "ProcessProperty (no match OP) %40s %20s", $tcname, $propertyOp;
+    	 }
+	    if ($rst =~ /^\s*$/) { $rst = "_noMatchedPropertyOP_";}
+	    if ((defined $prMsg) && ($prMsg ==1)) { print  $rst;}
 	    return $rst;
 }
 
@@ -550,19 +582,22 @@ sub processProperty {
 #	Output/Returns  : True/False
 ################################################################################
 sub matchProperty { # &matchProperty("QAOwner","ywang", "TC_tc1");
-	my $propertyName = "QAOwner"; my $propertyPattern = "ywangb"; my %array; my $tcname = "TC_tc1";
-	if ($_[0]) { $propertyName = $_[0];}
-	if ($_[1]) { $propertyPattern= $_[1];}
-	if ($_[2]) { $tcname = $_[2];}
+	my $propertyName = ".*"; my $propertyPattern = ".*"; my %array; my $tcname = "TC_tc1";
+	#if ($_[0]) { $propertyName = $_[0];}
+	#if ($_[1]) { $propertyPattern= $_[1];}
+	#if ($_[2]) { $tcname = $_[2];}
+	$propertyName = shift if (@_);
+	$propertyPattern= shift if (@_);
+	$tcname = shift if (@_);
 
 	 if (&getProperties(&getTCName($tcname)) =~ /info:There is no/ ) {
 		 return "False";
 	 }
+
 	foreach my $each (split /\n/,  &getProperties(&getTCName($tcname))) {
 		$each =~ /^\s*(\w+)\s*=\s*(\w+)\s*$/;
 		$array {$1}  = $2;
 	}
-# todo: properytNamePattern is not used here print "pa: $propertyName, $propertyPattern\n";  
 	foreach my $each (sort keys %array) {
 		if (($array{$each} =~ /$propertyPattern/) && ( $each =~ /$propertyName/)) { 
 			 return "True"; }
@@ -581,11 +616,10 @@ sub getProperties() { 	# get TC Property Names	(TH:TC Managements)
     if ($_[0]) {$tcname = $_[0];}
     if ($_[1]) {$propertyPattern = $_[1];}
     if ($_[2]) {$returnType = $_[2];} # option = single, value, latest
-    if ( -e  "$_[0]\\thProperty.txt" ) { ; } else { return "info:There is no $_[0]/thProperty.txt";}
+    if ( -e  "$_[0]\\thProperty.txt" ) { ; } else { return "info:There is no $_[0]/thProperty.txt here";}
     open Fin, "$_[0]\\thProperty.txt" || die "Can't open file:$!";
     while ( $_ = <Fin> ) {
         if ( $_ =~ /^\s*(\S+)\s*\|\s*(\S+)\s*\|/i ) {
-		# if ( $_ =~ /^\s*(\w+)\|\s*(\w+)\s*\|/i ) { #todo
 	      my $propertyName_ = $1; my $propertyValue_ = $2;
 
  	      if (($propertyName_ =~ /$propertyPattern/) || ( $propertyPattern eq '')) { # PropertyPattern Filter
@@ -646,6 +680,7 @@ sub modifyProperty() { 	# modify TC Property (TH:TC Managements)
     &deleteProperty( $tcname, $cmdStr );
     $cmdStr = "add=$propertyName:$propertyValue";
     &addProperty( $tcname, $cmdStr );
+    return "$propertyName is modified to $propertyValue for $tcname";
 }
 
 ################################################################################
@@ -658,7 +693,9 @@ sub deleteProperty() {	# delete TC Property	(TH:TC Managements)
     my $fname = "$_[0]\\thProperty.txt";
     my $fout  = $fname; $fout =~ s/\.txt/_Dumpster\.txt/;
 
-    my $propertyName = $_[1]; $propertyName =~ s/^\s*del\S*\s*=\s*//g; $propertyName =~ s/:\s*\S*//;
+    my $propertyName = $_[1]; 
+    if ($propertyName !~ /\s*del\S*\s*=\s*/) { return "Warning: wrong format  -del=prop1;pr2Screen";}
+    $propertyName =~ s/^\s*del\S*\s*=\s*//g; $propertyName =~ s/:\s*\S*//;
     my %array ;
     open Fin, "$fname"; @_ = <Fin>; close Fin;
 
@@ -675,6 +712,8 @@ sub deleteProperty() {	# delete TC Property	(TH:TC Managements)
         }
     }
     close Fout;
+    return "$propertyName is deleted from $fname";
+
 }
 
 ################################################################################
@@ -722,6 +761,7 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
         printf Fout "%20s|%10s%s\n",$1, $2,$timeStr;
 	}
     close Fout;
+    return "$propertyName is added to $fname";
 }
 
 sub getGlobalVars { 
@@ -761,60 +801,43 @@ sub setGlobalVars {
 	1;
 }
 
-sub processTCSettings {
-	shift;
-	@_ = split /;/, shift;
-	foreach my $each (@_) {
-		if ((($each =~ /listVars/i) || ($each =~ /getVars/i))&& ($each !~ /=/)) { return &getGlobalVars();} 
-		if (($each =~ /printVars/i) && ($each !~ /=/)) { print &getGlobalVars(); return 1;} 
-
-		$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/;
-		my $varName = $1; my $varValue = $2;
-		if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
-			if ($varName =~ /Drive/i) 		{ $SvrDrive = $varValue; }
-			if ($varName =~ /ProjName/i) 		{ $SvrProjName = $varValue; }
-			if ($varName =~ /TCName\b/i) 		{ $SvrTCName = $varValue; }
-			if ($varName =~ /TCNamePattern\b/i) 	{ $SvrTCNamePattern = $varValue; }
-			if ($varName =~ /TCNameExecPattern/i) 	{ $SvrTCNameExecPattern = $varValue; }
-			if ($varName =~ /tcOp/i) 		{ $tcOp= $varValue; }
-			if ($varName =~ /PropNamePattern/i)  	{ $SvrPropNamePattern= $varValue; }
-			if ($varName =~ /PropValuePattern/i)  	{ $SvrPropValuePattern= $varValue; }
-
-			if ($varName =~ /TestSuite/i) 		{ $SvrProjName = $varValue; }
-			if ($varName =~ /TCNameFilter\b/i) 	{ $SvrTCNamePattern = $varValue; }
-			if ($varName =~ /TCNameExecFilter/i) 	{ $SvrTCNameExecPattern = $varValue; }
-			if ($varName =~ /PropNameFilter/i)  	{ $SvrPropNamePattern= $varValue; }
-			if ($varName =~ /PropValueFilter/i)  	{ $SvrPropValuePattern= $varValue; }
-			if ($varName =~ /pr2Screen/i)  { $pr2Screen= $varValue; }
-		} else { return '';}
-	}
-	1;
-}
 
 sub help {
+if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
 
 my $help=<<EOF;
-$0 		-processTCSettings 
-					Drive=c:;
-					TestSuite=_testProj_;
-					TCOp=list;
-					TCName=TC_tcA1;
-					TCNameFilter=.*;
-					TCNameExecFilter=.*;
-					PropNameFilter=.*;
-					PropValueFilter.=.*;
-					pr2Screen=0|1;
-					getVars|listVars|printVars
-		-processTC 
-					create|list|get|exec|execAll|detect|delete|log|getLogName|reportTCResult|reportResultHistory
+-----------------------------------------------------------------------------------------------------------------------
+taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|delete|log|getLogName|printResult;all
 
-		-processProperty
-					add|delete|list|get|modify|match|filter|create
+	# e.g.  taf.pl -tc create=tc1;fail,overwrite
+	        taf.pl -tc create=tc1;fail,genLog;pr2Screen
+	        taf.pl -tc create=tc1;performanceTC,genLog;pr2Screen
+	        taf.pl -tc delete=tc1;pr2Screen
 
-		-help
-		-prDriver
+	-processTCs or -s  arg=[TCOP=list;...]  # e.g.  taf.pl -s TCNamePattern=tc.*
+	                                 	#       taf.pl -s list
+		Drive=c:;			# c: d: e: ...
+		TestSuite=_testSuit_;		# directory 
+		TCOp=list;			# List test cases that matches the TCNameFilter and PropertyFilter
+		TCName=_testCase_;		# test case name 
+		TCNamePattern=*;		# Test Case Name Filter 
+		TCNameFilter=*;			# Test Case Name Filter 
+		PropNameFilter=.*;		# Property_Name Filter
+		PropValueFilter.=.*;		# Property_Value Filter
+		pr2Screen;			# Results will be displayed on screen 
+		getVars|listVars|printVars	# get or print TAF settings
 
-		Note: perl.pl -MTest::AutomationFramework -e 
+	-processProperty or -prop arg=[add=prop1:val1]  add|delete|list|get|modify|match|filter
+
+	# e.g   taf.pl -prop list=tc;pr2Screen
+	        taf.pl -prop add=prop1:val1;pr2Screen
+	        taf.pl -prop match=.*:.*;pr2Screen
+	        taf.pl -prop match=propNameFilter:propValFilter
+
+	To create driver (taf.pl): perl.pl -MTest::AutomationFramework -e "help" 
+
+	taf.pl -processTCs create=tc1/fail,overwrite
+-----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
 
@@ -825,7 +848,55 @@ EOF
 	print " --> taf.pl\n";
 	}
 
+	if (-e "taf.bat") {;} else {
+my $str =<<EOF;
+
+REM create testsuit (ts)/test_case (tc) 
+taf.pl -s ts=_ts2_;create=_tc1_/overwrite  
+taf.pl -s ts=_ts2_;create=_tc2_/overwrite
+taf.pl -s ts=_ts2_;create=_tc3_/overwrite
+taf.pl -s ts=_ts2_;create=_tc4_/overwrite
+taf.pl -s ts=_ts2_;create=_tc5_/overwrite
+taf.pl -s ts=_ts2_;create=_tc6_/overwrite
+taf.pl -s ts=_ts1_;create=_tc1_/overwrite
+taf.pl -s ts=_ts1_;create=_tc2_/overwrite
+taf.pl -s ts=_ts1_;create=_tc3_/overwrite
+taf.pl -s ts=_ts1_;create=_tc4_/overwrite
+taf.pl -s ts=_ts1_;create=_tc5_/overwrite
+taf.pl -s ts=_ts1_;create=_tc6_/overwrite
+taf.pl -s ts=_ts3_;create=_tc1_/overwrite
+REM performance test 
+taf.pl -s ts=_ts3_;create=_tc2_/overwrite,perf
+REM Failed Functional test 
+taf.pl -s ts=_ts3_;create=_tc3_/overwrite,fail
+taf.pl -s ts=_ts3_;create=_tc4_/overwrite
+taf.pl -s ts=_ts3_;create=_tc5_/overwrite,fail
+taf.pl -s ts=_ts3_;create=_tc6_/overwrite
+
+REM exec all tests under test_suit (ts)
+taf.pl -s ts=_ts1_;op=exec
+taf.pl -s ts=_ts1_;tc=*;top=exec
+taf.pl -s ts=_ts1_;tc=tc1*;top=exec
+
+taf.pl -s ts=_ts2_;op=exec
+taf.pl -s ts=_ts3_;op=exec
+
+REM Seting the moving bar for showing test-in-prog status
+taf.pl -s ts=_ts3_;updateWeb=_tc1_/2
+taf.pl -s ts=_ts3_;updateWeb=_tc2_/1
+taf.pl -s ts=_ts3_;updateWeb=_tc3_/3
+
+
+\@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\_ts3_\\index.htm"
+EOF
+	open Fout, ">taf.bat";
+	print Fout $str;
+	close Fout;
+	print " --> taf.bat\n";
+	my $cmd = 'taf.bat'; system $cmd;
+	}
 }
+
 
 
 sub prDriver {
@@ -834,22 +905,23 @@ sub prDriver {
 use Test::AutomationFramework;
 use Getopt::Long;
 	GetOptions(
-	    'processTCSettings=s'          => \\\$processTCSettings,			
-	    'processTC=s'                  => \\\$processTC,		
-	    'processProperty=s'            => \\\$processProperty,		
+	    'processTCs|settings|s=s'          => \\\$processTCs,			
+	    'processTC|tc=s'                  => \\\$processTC,		
+	    'processProperty|property=s'            => \\\$processProperty,		
 	    'help'                  	   => \\\$help,	
-	    'prDriver'                     => \\\$prDriver,	
 	);
 \$TAF = new Test::AutomationFramework;
 if (\$help) {\$TAF->help();}
 if (\$prDriver) {\$TAF->prDriver();}
-if (\$processTCSettings) { \$TAF->processTCSettings(\$processTCSettings);}
-if (\$processProperty) 	{ \$TAF->processTC(\$processProperty);}
+if (\$processTCs) { \$TAF->processTCs(\$processTCs);}
+if (\$processProperty) 	{ \$TAF->processProperty(\$processProperty);}
 if (\$processTC) 	{ \$TAF->processTC(\$processTC);}
 
 EOF
 if (@_) { return $driver;} else { print $driver;}
 }
+
+
 ################################################################################
 #	Subroutine Name : getDate
 #		Function: get current Datetime 
@@ -931,6 +1003,12 @@ sub getRoot {
 
 sub prHtml1 {
 &createFile( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, '' );
+my $str =<<EOF;
+taf.pl       : TAF Driver    
+taf.bat      : TCs struc setup
+tc.pl        : TC hook       
+_tcAppend.txt: TC log  hook 
+EOF
 my $tmp =<<EOF;
 
 <html>
@@ -954,9 +1032,10 @@ my $tmp =<<EOF;
 	</script>
 </head>
 <body OnLoad ="function1()">
+<script type="text/javascript"> if (navigator.appName != "Microsoft Internet Explorer") alert("Please use IE to access TAF's webUI") </script>
 <pre>
 <p>
-<h2> <a href="http://127.0.0.1//Trainings/">Test Automation Framework </h2> <font size ="2" </font> </a>
+<h2> <a href="http://127.0.0.1//Trainings/" title="$str">Test Automation Framework </h2> <font size ="2" </font> </a>
 <a title=\"latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Test Case Naem\">TC Name</a>                       -Pass/Fail-    <a title=\"pass/fail counts\">Ctr</a>    Average ResponseTime         over time span   ( start Date time  --  end Date Time)           <a title=\"Manual command to exec TC\">-TC Exec Command-</a> </span>
 EOF
 &appendtoFile ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $tmp);
@@ -1039,76 +1118,36 @@ TH:Generic Functions     getHostFromIP            Get Host done by SZ Team Charl
 
 
 =head1 NAME
-    	Test::AutomationFramework - Test Automation Framework  (TAF)
+Test::AutomationFramework - Test Automation Framework  (TAF)
 
-=head1 SYNOPSIS
-	use Test::AutomationFramework
-	my $TAF = new Test::AutomationFramework;
-	$TAF->testOp(......);
-	$TAF->propertyOp(......);
+=head2 SYNOPSIS
+	1. Download and install Test::AutomationFramework from CPAN
+	2. DOS>perl -MTest::AutomationFramework -e "help"
+	3. A WebUI is created, which can display and execute, as well as view test case by *ONE* mouse click
+	3. Modify taf.bat for the automated test suit structures 
+	4. Modify c:\[test_suit]\[test_case]\tc.pl to plug-in the customer test case
+	5. Execute taf.bat to get the webUI
+	6. Run test cases, view test result, view test logs with mouse click only. - Enjoy TAF
+	7. Please email ywangperl@gmail for questions/suggestions/bugs 
 
-=head1 DESCRIPTION
-	TAF manages automated test cases with test case setup, test case query, test case execution and 
-	test reult reporting based on the concept of Test Property. 
+=head2 DESCRIPTION
+	TAF manages automated test cases regarding test setup, test query, test execution and 
+	test reult reportings without any programming nor reading user manual. 
 
-=head2	User Level Operations 
-
-	Test Automation Operations: 	tf.pl -testOP [create|list|delete|exec]
-	Property        Operations: 	tf.pl -propertyOP [create|add|list|modify|delete]
-	TC & Property   Operations: 	tf.pl -tcOP [create|list|delete|exec] -propertyOP [create|add|list|modify|delete]
-
-=head2	Programmer Level Test Automation Operations 
-
-	TAF defines an Automated Test Case as a script that returns pass, fail, number
-	Test Case Format: [Drive:]\[projName]\[tcDefaultName]  e.g c:\testProj1\tc.pl (return pass|fail)
-	TAF manages automated test case created by different computer languages 
-	-defaultTCName 
-	* Create an automated TC  for testProj1   TAF->testOp(create="c:","projName","tc.pl");
-	* List      automated TCs of  testProj1   TAF->testOp(  list="c:","projName","tc.pl");
-	* Delete    automated TCs of  testProj1   TAF->testOp(delete="c:","projName","tc.pl");
-	* exec      automated TCs of  testProj1   TAF->testOp(  exec="c:","projName","tc.pl");
-	  
-=head2	Programmer Level Property Operations 
-
-	TAF manages Automated Test Case by the concept of TC Property 
-	* Set 1st TC1's QA Owner is Yong	TAF->propertyOP(create=QAOwner:Yong);
-	* Set 2nd TC1's QA Owner is Joe     	TAF->propertyOP(   add=QAOwner:Joe);
-	* Set TC2 as a smoke test 		TAF->propertyOP(create=TCType:SmokeTest);
-	* Set TC3 as both a regresson testand a performance test TAF->propertyOP(create=TestType:Regression);
-	* List Smoke Test Suite's TCs		TAF->propertyOP(list=TestType:SmokeTest*);
-	* Execute smoke test suite 		TAF->propertyOP(list=TestType:SmokeTest*);
-	* Report smoke test suite's latest results  	TAF->propertyOP(create=QAOwner:Yong);
-	* Report smoke test suite's historical results 	TAF->propertyOP(create=QAOwner:Yong);
-	* Set tc5 Status = inactive 		TAF->propertyOP(create=TCStatus:inactive);
-	* Set all smoke tests with Status = Outdated TAF->propertyOP(create=TCStatus:outdated);
-	* Delete all smoke tests 		TAF->propertyOP(tcType=SmokeTest);
-	* List all TC Properties		TAF->PropertyOp(listProperties);
-	* Delete TC Properties			TAF->PropertyOp(delete=TCType:SmokeTest);
-	* defaultTCName = tc.pl
-
-=head2	TAF reports test results on STDOUT and HTML 
-
-	* List the lastest smoke test results		TAF->tcResult("Result")
-	* List the historical function test results 	TAF->tcResult("Log");
-	* List the historical function test results 	TAF->tcResult("HistoricalLog");
-	* List the Yong's test result
-
-=head2	Programmer Level Test Report Operations:
-
-	* Record the TC log
-	* Record the TC historical log
-	* Generate Perl Driver tf.pl 
+	TAF defines a automated test case as [c:]\[test_suite]\[test_case]\tc.pl
+		tc.pl returns Pass|fail|numerical number
+		tc.pl creates tc's log file as [c:]\[test_suite]\[test_case]\tc.pl
+		tc.pl creates test suite's webUI at [c:]\[test_suite]\index.htm 
 
 =head1  LICENSE
-	This script is free software; you can redistribute it and/or modify it
-	under the same terms as Perl itself.
+	This script is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
 =head1 AUTHOR
     	Yong Wang (ywangperl@gmail.com)
 
 =cut;
 
-1;
 
+1;
 
 
