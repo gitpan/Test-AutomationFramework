@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Test-AutomationFramework
-version:            0.02
+version:            0.05
 abstract:           Test Automation Framework  (TAF)
 author:
     - Yong Wang <ywangperl@gmail.com>

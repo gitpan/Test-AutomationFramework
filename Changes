@@ -1,8 +1,0 @@
-Revision history for Perl extension Test::AutomationFramework.
-
-0.02  Tue Nov 26 20:53:26 2011
-	- tested with User Level tf1.pl 
-0.01  Tue Nov 22 18:53:26 2011
-	- original version; created by h2xs 1.23 with options
-		-AXc -n Test::AutomationFramework
-
