@@ -6,7 +6,7 @@ WriteMakefile(
     NAME              => 'Test::AutomationFramework',
     VERSION_FROM      => 'lib/Test/AutomationFramework.pm', # finds $VERSION
     PREREQ_PM         => {
-         "Date::Manip" => 6.23,
+      "Date::Manip" => 6.23,
       "File::Path"=> 2.08_01,
       "Test::More"=> 0.96,
       "Getopt::Long"=> 2.38,

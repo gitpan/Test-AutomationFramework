@@ -8,6 +8,7 @@ use Test::More;
 use Getopt::Long;
 use File::Copy;
 use File::Find;
+use Cwd;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 require Exporter;
 our @ISA = qw(Exporter);
@@ -17,13 +18,14 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
 help
+install
 processTCs
 processTC
 processProperty
 );
 
 
-our $VERSION = '0.05';   
+our $VERSION = '0.051';   
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";
@@ -31,16 +33,16 @@ our $VERSION = '0.05';
 	my $reportHtml  	= 'index.htm';
 	my $reportHtml1 	= '_tcReport_.html';
 	my $reportHistoryHtml 	= '_tcReportHistory_.html';
-	my $SvrDrive = 'c:/_TAF'; 
-	my $SvrProjName = '_testSuit_'; 
-	my $SvrTCName = '_testCase_';
-	my $SvrTCNamePattern = "*"; 
-	my $SvrPropNamePattern = '.*';
+	my $SvrDrive 		= 'c:/_TAF'; 
+	my $SvrProjName 	= '_testSuit_'; 
+	my $SvrTCName 		= '_testCase_';
+	my $SvrTCNamePattern 	= "*"; 
+	my $SvrPropNamePattern 	= '.*';
 	my $SvrPropValuePattern = ".*";
 	my $SvrTCNameExecPattern = ".".$SvrTCNamePattern;
-	my $tcOp= 'list';	
- 	my $pr2Screen = 1;
-	my $SvrLogDir = ''.$SvrProjName.'';
+	my $tcOp		= 'list';	
+ 	my $pr2Screen 		= 1;
+	my $SvrLogDir 		= ''.$SvrProjName.'';
 
 
 sub new { my $package = shift;
@@ -49,8 +51,7 @@ sub new { my $package = shift;
 
 sub tcLoop {
 	if ($pr2Screen == 1) {print "Processing ......\n" ; } else { print "";}
-	#  &tcPre(); my $returnValue = &tcMain(); &tcPost(); 
-	   &tcPre(); my $returnValue = &tcMain_(); &tcPost(); 
+	   &tcPre(); my $returnValue = &tcMain(); &tcPost(); 
 	if ($pr2Screen==1) {print " - Completed -"; } else { print "";}
 	return $returnValue;
 }
@@ -61,7 +62,7 @@ sub tcPre {
  	&appendtoFile($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHistoryHtml,"<html><body><pre>\n");
 	########################################################
 }
-sub tcMain {
+sub tcMain_bkup {
 	##################### Test Execution ###################
 	my $returnValue ='';
 	foreach my $eachTC (<$SvrDrive/$SvrProjName/$SvrTCNamePattern>) {				# TC Filter
@@ -83,7 +84,7 @@ sub tcMain {
 	########################################################
 }
 
-sub tcMain_ { $notUsegetTCName= 1; find(\&recursiveSearchtcMain, $SvrDrive); }
+sub tcMain { $notUsegetTCName= 1; find(\&recursiveSearchtcMain, $SvrDrive); }
 sub recursiveSearchtcMain() { 
 	my $returnValue ='';
 	if ($SvrTCNamePattern eq '*') { $SvrTCNamePattern = '.*';} 
@@ -381,21 +382,23 @@ sub processTCs{
 				&setGlobalVars("","tcOP=list");
 				$isBatchProcessing = 1;
 			} elsif ($each =~ /\blistAll\b/i) { ;
-			 	$SvrTCNamePattern =".*";  &listAll(); 
+				$SvrTCNamePattern =".*";  &listAll(); 
 				$isBatchProcessing = 0;		
+			} elsif ($each =~ /\binstall\b/i) {
+				&install(); 
 			} else  {
 				my $str =  "\&$each();"; my $rst = eval $str; next;  
 			}
 		} else {
-		$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/; my $varName = $1; my $varValue = $2;
-		if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
+		     $each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/; my $varName = $1; my $varValue = $2;
+		     if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
 			$isBatchProcessing = 1;
  			if (&setGlobalVars ("","$varName=$varValue;") == 1 ) 		{ 
 				; }
 			else {
 				$isBatchProcessing = 0; my $rst = &processTC("",$each) ;
 			}
-	 	}
+	 	     }
 		}
 	} # end of each
 	if ($isBatchProcessing == 1) {&tcLoop();}
@@ -878,65 +881,56 @@ sub setGlobalVars {
 
 
 sub help {
-if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
-
+	if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+print "pb:\n";
 my $help=<<EOF;
 -----------------------------------------------------------------------------------------------------------------------
-taf.pl testsuit=_ts1_;list 
-taf.pl testsuit=_ts1_;testcase=_tc1_;list 
+	Test::AutomationFramework - Test Automation Framework  (TAF)
+
+	TAF manages automated test cases regarding test setup, test query, test execution and 
+	test reult reportings without any programming nor reading user manual. Any above operations
+	can be done with *ONE* mouse click.
+
+	TAF interfaces with the automated test case by [c:]\\_TAF\\[test_suite]\\[test_case]\\tc.pl
+
+		tc.pl  returns Pass|fail|numerical number in seconds
+		tc.pl  creates tc's log file as [c:]\\[test_suite]\\[test_case]\\_appendLog.txt 
+		taf.pl creates test suite's webUI at [c:]\\[test_suite]\\index.htm 
+
+	The TAF application steps are the following:
+
+	1. Install Test::AutomationFramework from CPAN   (Perl -MCPAN -e "install Test::AutomationFramework)
+	2. DOS>perl -MTest::AutomationFramework -e "install"                   (Ensure taf.pl is in %PATHT%)
+	3. A WebUI is created, which can display and execute, as well as view test case by *ONE* mouse click
+		                               (open c:\\_TAF\\[test_suite]\\[test_case]\\index.htm with IE)
+	4. Modify taf.bat to define the test suit structure, which maps to the automated test cases
+	5. Modify c:\\_TAF\\[test_suite]\\tsProperty.txt to define the webUI's test description
+	6. Modify c:\\_TAF\\[test_suit]\\[test_case]\\tc.pl to plug-in the automated test case
+	7. Execute taf.bat to create the test suit structure and start the webUI
+	8. TAF usages:  	1. Exec test cases 		      	  	  (click pass|fail counters)
+				2. Exec test suite 		            (click title pass|fail counters)
+				3. View historical pass/fail 	                           (click Pass|Fail) 
+				4. View historical logs		                           (click Test Desc) 
 
 
-taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|delete|log|getLogName|printResult;all
+	TAF usage examples: 
 
-	# e.g.  taf.pl -tc create=tc1;fail,overwrite
-	        taf.pl -tc create=tc1;fail,genLog;pr2Screen
-	        taf.pl -tc create=tc1;performanceTC,genLog;pr2Screen
-	        taf.pl -tc delete=tc1;pr2Screen
-
-	-processTCs or -s  arg=[TCOP=list;...]  # e.g.  taf.pl -s TCNamePattern=tc.*
-	                                 	#       taf.pl -s list
-		Drive=c:;			# c: d: e: ...
-		TestSuite=_testSuit_;		# directory 
-		TCOp=list;			# List test cases that matches the TCNameFilter and PropertyFilter
-		TCName=_testCase_;		# test case name 
-		TCNamePattern=*;		# Test Case Name Filter 
-		TCNameFilter=*;			# Test Case Name Filter 
-		PropNameFilter=.*;		# Property_Name Filter
-		PropValueFilter.=.*;		# Property_Value Filter
-		pr2Screen;			# Results will be displayed on screen 
-		getVars|listVars|printVars	# get or print TAF settings
-
-	-processProperty or -prop arg=[add=prop1:val1]  add|delete|list|get|modify|match|filter
-
-	# e.g   taf.pl -prop list=tc;pr2Screen
-	        taf.pl -prop add=prop1:val1;pr2Screen
-	        taf.pl -prop match=.*:.*;pr2Screen
-	        taf.pl -prop match=propNameFilter:propValFilter
-
-	To create driver (taf.pl): perl.pl -MTest::AutomationFramework -e "help" 
-
-	taf.pl -processTCs create=tc1/fail,overwrite
-
-	Note: 
-	-------- c:/_TAF/_ts1_/tsProperty.txt ----------
-	web_ui_title: Purge Algorithm Test Cases - based on Tesbed : web_ui_title
-	c:/_TAF/purge_testbed/testcase01, 1  Purge Root Node                                             (purge Table11)
-	c:/_TAF/_ts1_/_tc1_ , test case 1 desc
-	c:/_TAF/_ts1_/_tc2_ , test case 2 desc
+	taf.pl -help 
+	taf.pl testsuit=testsuitA;list			List test cases of testsuitA
+	taf.pl testsuit=testsuitA;exec			Exec test cases of testsuitA
+	taf.pl -install 
 -----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
-	if (-e "taf.pl") {;} else {
-	open Fout, ">taf.pl";
-	print Fout &prDriver(1);
-	close Fout;
-	print " --> taf.pl\n";
-	}
 
+}
+
+sub install 
+{
+	if (getcwd =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from a directory.'; exit}
+	if (-e "taf.pl") {;} else { open Fout, ">taf.pl"; print Fout &prDriver(1); close Fout; print " --> taf.pl\n"; }
 	if (-e "taf.bat") {;} else {
 my $str =<<EOF;
-
-
 REM create test_suit (test_suit)/test_case (tc) 
 taf.pl testsuit=_test_suit2_;create=_testcase1_/overwrite  
 taf.pl testsuit=_test_suit2_;create=_testcase2_/overwrite
@@ -981,13 +975,8 @@ REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:c:/tmp/p
 
 \@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\_TAF\\_test_suit3_\\index.htm"
 
-
 EOF
-	open Fout, ">taf.bat";
-	print Fout $str;
-	close Fout;
-	print " --> taf.bat\n";
-	my $cmd = 'taf.bat'; system $cmd;
+	open Fout, ">taf.bat"; print Fout $str; close Fout; print " --> taf.bat\n"; my $cmd = 'taf.bat'; system $cmd;
 	}
 }
 
@@ -995,12 +984,12 @@ sub prTestSuitProperty {
 open Fout, ">c:/_TAF/_test_suit3_/tsProperty.txt";
 my $str = <<EOF;
 web_ui_title: Test Automation Framework : web_ui_title
-c:/_TAF/_test_suit3_/_testcase1_| 1  Test case 1 description                            Manual edit please     
-c:/_TAF/_test_suit3_/_testcase2_| 2  Test case 2 description for tsProperty.txt         Manual edit please     
-c:/_TAF/_test_suit3_/_testcase3_| 3  Test case 3 description for .. tsProperty.txt      Manual edit please     
-c:/_TAF/_test_suit3_/_testcase4_| 4  Test case 4 description for ... tsProperty.txt     Manual edit please     
-c:/_TAF/_test_suit3_/_testcase5_| 5  Test case 5 description for .... tsProperty.txt    Manual edit please     
-c:/_TAF/_test_suit3_/_testcase6_| 6  Test case 6 description for ..... tsProperty.txt   Manual edit please     
+c:/_TAF/_test_suit3_/_testcase1_| 1  Test case 1 description (see c:/_TAF/_test_suit3_/tsProperty.txt    )     
+c:/_TAF/_test_suit3_/_testcase2_| 2  Test case 2 description (see c:/_TAF/_test_suit3_/tsProperty.txt    )
+c:/_TAF/_test_suit3_/_testcase3_| 3  Test case 3 description (see c:/_TAF/_test_suit3_/tsProperty.txt    )
+c:/_TAF/_test_suit3_/_testcase4_| 4  Test case 4 description (see c:/_TAF/_test_suit3_/tsProperty.txt    )
+c:/_TAF/_test_suit3_/_testcase5_| 5  Test case 5 description (see c:/_TAF/_test_suit3_/tsProperty.txt    )
+c:/_TAF/_test_suit3_/_testcase6_| 6  Test case 6 description (see c:/_TAF/_test_suit3_/tsProperty.txt    )
 EOF
 print Fout $str;
 close Fout
@@ -1015,11 +1004,13 @@ use Getopt::Long;
 	    'processTC|tc=s'                  => \\\$processTC,		
 	    'processProperty|property=s'      => \\\$processProperty,		
 	    'help'                  	      => \\\$help,	
+	    'install'                  	      => \\\$install,	
 	    'prTestSuitProperty'              => \\\$prTsProperty,	
 	);
 \$TAF = new Test::AutomationFramework;
 if (\$prTsProperty) {\$TAF->prTestSuitProperty();}
 if (\$help) {\$TAF->help();}
+if (\$install) {\$TAF->install();}
 if (\$prDriver) {\$TAF->prDriver();}
 if (\$processTCs) { \$TAF->processTCs(\$processTCs);}
 if (\$processProperty) 	{ \$TAF->processProperty(\$processProperty);}
@@ -1117,7 +1108,7 @@ tc.pl        : TC hook
 _tcAppend.txt: TC log  hook 
 EOF
 
-	my $strTmp = sprintf "%-60s", "TC Name"; 
+	my $strTmp = sprintf "%-60s", "Test Case Description"; 
 	my $TCCtrToolTip = sprintf "Click to exec Test Suit"; 
 	my $tmp1 = sprintf("<a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
 		
@@ -1231,25 +1222,39 @@ TH:Generic Functions     getHostFromIP            Get Host done by SZ Team Charl
 
 
 =head1 NAME
+
 Test::AutomationFramework - Test Automation Framework  (TAF)
 
 =head2 SYNOPSIS
+
 	1. Download and install Test::AutomationFramework from CPAN
+
 	2. DOS>perl -MTest::AutomationFramework -e "help"
+
 	3. A WebUI is created, which can display and execute, as well as view test case by *ONE* mouse click
-	3. Modify taf.bat for the automated test suit structures 
-	4. Modify c:\[test_suit]\[test_case]\tc.pl to plug-in the customer test case
-	5. Execute taf.bat to get the webUI
-	6. Run test cases, view test result, view test logs with mouse click only. - Enjoy TAF
-	7. Please email ywangperl@gmail for questions/suggestions/bugs 
+
+	4. Modify taf.bat for the automated test suit structures 
+
+	5. Modify c:\_TAF\[test_suit]\[test_case]\tc.pl to plug-in the customer test case
+
+	6. Execute taf.bat to get the webUI
+
+	7. Run test cases, view test result, view test logs with mouse click only. - Enjoy TAF
+
+	8. Please email ywangperl@gmail for questions/suggestions/bugs 
 
 =head2 DESCRIPTION
+
 	TAF manages automated test cases regarding test setup, test query, test execution and 
+
 	test reult reportings without any programming nor reading user manual. 
 
-	TAF defines a automated test case as [c:]\[test_suite]\[test_case]\tc.pl
-		tc.pl returns Pass|fail|numerical number
-		tc.pl creates tc's log file as [c:]\[test_suite]\[test_case]\tc.pl
+	TAF interfaces with the automated test case by [c:]\_TAF\[test_suite]\[test_case]\tc.pl
+
+		tc.pl returns Pass|fail|numerical number in seconds
+
+		tc.pl creates tc's log file as [c:]\[test_suite]\[test_case]\_appendLog.txt 
+
 		tc.pl creates test suite's webUI at [c:]\[test_suite]\index.htm 
 
 =head1  LICENSE
@@ -1283,3 +1288,52 @@ taf.pl ts=_test_suit1_ -listTC
 taf.pl ts=_test_suit1_ tc=*test* -listT
 rem taf.pl listAll=test_suit1;exec
 rem taf.pl listAll=test_suit1;list
+
+
+
+
+my $help=<<EOF;
+-----------------------------------------------------------------------------------------------------------------------
+taf.pl testsuit=_ts1_;list 
+taf.pl testsuit=_ts1_;testcase=_tc1_;list 
+
+
+taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|delete|log|getLogName|printResult;all
+
+	# e.g.  taf.pl -tc create=tc1;fail,overwrite
+	        taf.pl -tc create=tc1;fail,genLog;pr2Screen
+	        taf.pl -tc create=tc1;performanceTC,genLog;pr2Screen
+	        taf.pl -tc delete=tc1;pr2Screen
+
+	-processTCs or -s  arg=[TCOP=list;...]  # e.g.  taf.pl -s TCNamePattern=tc.*
+	                                 	#       taf.pl -s list
+		Drive=c:;			# c: d: e: ...
+		TestSuite=_testSuit_;		# directory 
+		TCOp=list;			# List test cases that matches the TCNameFilter and PropertyFilter
+		TCName=_testCase_;		# test case name 
+		TCNamePattern=*;		# Test Case Name Filter 
+		TCNameFilter=*;			# Test Case Name Filter 
+		PropNameFilter=.*;		# Property_Name Filter
+		PropValueFilter.=.*;		# Property_Value Filter
+		pr2Screen;			# Results will be displayed on screen 
+		getVars|listVars|printVars	# get or print TAF settings
+
+	-processProperty or -prop arg=[add=prop1:val1]  add|delete|list|get|modify|match|filter
+
+	# e.g   taf.pl -prop list=tc;pr2Screen
+	        taf.pl -prop add=prop1:val1;pr2Screen
+	        taf.pl -prop match=.*:.*;pr2Screen
+	        taf.pl -prop match=propNameFilter:propValFilter
+
+	To create driver (taf.pl): perl.pl -MTest::AutomationFramework -e "help" 
+
+	taf.pl -processTCs create=tc1/fail,overwrite
+
+	Note: 
+	-------- c:/_TAF/_ts1_/tsProperty.txt ----------
+	web_ui_title: Purge Algorithm Test Cases - based on Tesbed : web_ui_title
+	c:/_TAF/purge_testbed/testcase01, 1  Purge Root Node                                             (purge Table11)
+	c:/_TAF/_ts1_/_tc1_ , test case 1 desc
+	c:/_TAF/_ts1_/_tc2_ , test case 2 desc
+-----------------------------------------------------------------------------------------------------------------------
+EOF

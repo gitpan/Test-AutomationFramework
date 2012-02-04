@@ -1,28 +1,28 @@
 Test-AutomationFramework version 0.05
 =====================================
 
-Test::AutomaitonFramework (TAF) is a Perl Win32 module to assist Test Automation. Here is the functional brief:
+Test::AutomaitonFramework (TAF) is a Perl Win32 module to assist Test Automation by:
 
-	0. Test Case Management: list, report, log, exec test cases		(View test latest and historical result; exec TC and Test suite)
-	1. Simplicity: No programming is required. No Automation is required. 	(perl -MTest::AutomationFramework -e "help") 
-	2. MultiPurpose:  TC scripts, Perf, Lab setup etc  			(Perl, C, C#, java ....... )
-	3. User Fridedly: IE-based web UI 					(TC list, reporting, execution are done by one mouse click )
-	4. Support Win32/IE 							(This is the tested environment)
-	5. Free software and free support
+	1. Test Case Management: list, report, log, exec test cases		(View test latest and historical result; exec TC and Test suite)
+	2. Simplicity: No programming is required. No Manul to read             (perl -MTest::AutomationFramework -e "install") 
+	3. MultiPurpose:  TC scripts, Perf, Lab setup etc  			(Perl, C, C#, java ....... )
+	4. User Fridedly: IE-based web UI 					(TC list, reporting, execution are done by *ONE* mouse click )
+	5. Support Win32/IE 							(This is the tested environment)
+	6. Free software and free support
 
 INSTALLATION
 
 To install this module type the following:
 
    perl Makefile.PL
-   nmake
-   nmake test
-   nmake install
+   dmake
+   dmake test
+   dmake install
 
 Non-programming Usage:
 
-   1. Modify c:\bin\*\taf.bat to create the test structure
-   2. Execut c:\bin\*\taf.bat 
+   1. Modify taf.bat to create the test structure
+   2. Execut taf.bat 
    3. Modify c:\_TAF\_testsuit_\_testcase_\tc.pl (automated TC hook)
    4. Modify c:\_TAF\_testsuit_\tsProperty.txt   (WebUI's Test Case Description )
    5. Open c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
@@ -33,13 +33,13 @@ Non-programming Usage:
 DEPENDENCIES
 	
 This module requires these other modules and libraries:
-Date::Manip;
-File::Path;
-Test::More;
-Getopt::Long;
-File::Copy;
+Date::Manip 
+File::Path 
+Test::More 
+Getopt::Long 
+File::Copy 
 File::Find
-
+Cwd::getcwd
 COPYRIGHT AND LICENCE
 
 Copyright 2012 by Yong Wang (ywangperl@gmail.com) 
