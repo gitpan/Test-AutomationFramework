@@ -25,7 +25,7 @@ processProperty
 );
 
 
-our $VERSION = '0.051';   
+our $VERSION = '0.052';   
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";
