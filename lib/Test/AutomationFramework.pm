@@ -20,10 +20,11 @@ help
 processTCs
 processTC
 processProperty
+genDriver
 );
 
 
-our $VERSION = '0.053';   
+our $VERSION = '0.054';   
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";
@@ -932,6 +933,11 @@ taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|d
 -----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
+	&genDriver();
+
+}
+
+sub genDriver {
 	if (-e "taf.pl") {;} else {
 	open Fout, ">taf.pl";
 	print Fout &prDriver(1);
@@ -996,7 +1002,6 @@ EOF
 	my $cmd = 'taf.bat'; system $cmd;
 	}
 }
-
 sub prTestSuitProperty {
 open Fout, ">c:/_TAF/_test_suit3_/tsProperty.txt";
 my $str = <<EOF;

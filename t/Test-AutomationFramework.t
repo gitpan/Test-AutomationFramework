@@ -6,6 +6,8 @@ use Test::AutomationFramework;
 my $cmd; my $rst; my $loaded = 1; my $tcName ; my $tcDesc ;  my $tcOp;
 my $taf= 'taf.pl';
 ########################## End of black magic.
+my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
+
 	&test1_pre(); 
 	&test1_verify();
      	&test1_verifyB();
@@ -314,7 +316,7 @@ sub regression4TC {
 	}
 sub test1_pre { # create - Test Bed 
 	# $cmd = "perl -MTest::AutomationFramework -e \"help\""; `$cmd`;
-	$cmd = "perl -MTest::AutomationFramework -e \"install\""; `$cmd`;
+	$cmd = "perl -MTest::AutomationFramework -e \"prDriver\""; `$cmd`;
 	# $cmd =  $taf. ' -processTCs printVars '; $rst = `$cmd`; print $rst."\n";
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;create=testcase; '; $rst = `$cmd`; print $rst;
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;create=testcase1; '; $rst = `$cmd`; print $rst;

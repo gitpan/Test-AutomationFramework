@@ -1,7 +1,7 @@
 Test-AutomationFramework version 0.053
 =====================================
 
-Test::AutomaitonFramework (TAF) is a Perl Win32 module to assist Test Automation by:
+Test::AutomaitonFramework (TAF) is a Perl Win32/64 module to assist Test Automation by:
 
 	1. Test Case Management: list, report, log, exec test cases		(View test latest and historical result; exec TC and Test suite)
 	2. Simplicity: No programming is required. No Manul to read             (perl -MTest::AutomationFramework -e "install") 
@@ -10,10 +10,12 @@ Test::AutomaitonFramework (TAF) is a Perl Win32 module to assist Test Automation
 	5. Support Win32/IE 							(This is the tested environment)
 	6. Free software and free support
 
-INSTALLATION
+INSTALLATION (Suggest to install Strawberry Perl, which has development utilities, like dmake.exe)
 
 To install this module type the following:
 
+   cd c:\bin <- included in PATH environ variable 
+   perl -MCPAN -e "install Date::Manip" (for Strawberry Perl) or ppm install Date::Manip (for ActivePerl)
    perl Makefile.PL
    dmake
    dmake test
@@ -25,22 +27,19 @@ Non-programming Usage:
    2. Execut taf.bat 
    3. Modify c:\_TAF\_testsuit_\_testcase_\tc.pl (automated TC hook)
    4. Modify c:\_TAF\_testsuit_\tsProperty.txt   (WebUI's Test Case Description )
-   5. Open c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
+   5. Open   c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
    6. Have fun with the TAF
-
-   (ppm support will be available soon)
 
 DEPENDENCIES
 	
 This module requires these other modules and libraries:
-Date::Manip 
+Date::Manip 	
 File::Path 
 Test::More 
 Getopt::Long 
 File::Copy 
 File::Find
 Cwd::getcwd
-COPYRIGHT AND LICENCE
 
 Copyright 2012 by Yong Wang (ywangperl@gmail.com) 
 
