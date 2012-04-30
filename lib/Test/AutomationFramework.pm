@@ -24,7 +24,7 @@ genDriver
 );
 
 
-our $VERSION = '0.054';   
+our $VERSION = '0.054.5';   
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";
@@ -91,11 +91,9 @@ sub recursiveSearchtcMain() {
 	if (($File::Find::name =~ /tc.pl/) && ($File::Find::name =~ /$SvrDrive\/$SvrProjName/i) && ($File::Find::name =~ /$SvrTCNamePattern/i))  # TC Filter
 	{	my $eachTC = &getRoot($File::Find::name);	
 		$SvrTCName = &getDir($File::Find::name);
-		#if ( &matchProperty ($SvrPropNamePattern, $SvrPropValuePattern, $eachTC) =~ /true/i) {	# Property Filter
 		$eachTC = &getRoot($eachTC);
 		if ($propertyOp !~ /^\s*$/) { printf "%20s\n", &processProperty($eachTC, $propertyOp); }  # PropertyManagement
 		elsif (($tcOp !~ /^\s*$/)&&($SvrTCName =~/$SvrTCNameExecPattern/))  { 
-			# print "pb: $SvrTCName, $eachTC, $SvrTCNameExecPattern \n"; 
 			&updateWeb(&getDir($File::Find::name),1);
 			$returnValue = $returnValue. &processTC("","$tcOp=$eachTC",$pr2Screen)."\n";   	  # TC Execution
 			sleep $sleep4Display;
@@ -352,7 +350,8 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 	my $dirRoot = &getRoot($tcname); 
 	my $TCCtrToolTip = sprintf "Click to exec TC (Avg Response Time %.2fs)", $avgResponseTime; 
 	my $TCScrollAmount = 0; my $CtrSeparator = "|";
-	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"file:\\\\\\$tcname\\_tcLog.html\" title=\"Click to see TC Logs\"> %-80s</a> <a href=\"file:///$SvrDrive/$SvrProjName/${reportHistoryHtml}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$scriptName -s drive=$SvrDrive;testsuit=$SvrProjName;testcaseExec=$dirRoot;exec')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee width=48 direction=right behavior=alternate loop=10000 scrollamount=$TCScrollAmount>%-5d</marquee></a></font> AvgRespTime: %-10.2f     <font color=\"black\"> TimeSpan: %20s -- %20s       %s </font></span></li>\n",
+	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
+	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"file:\\\\\\$tcname\\_tcLog.html\" title=\"Click to see TC Logs\"> %-80s</a> <a href=\"file:///$SvrDrive/$SvrProjName/${reportHistoryHtml}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;testsuit=$SvrProjName;testcaseExec=$dirRoot;exec')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee width=48 direction=right behavior=alternate loop=10000 scrollamount=$TCScrollAmount>%-5d</marquee></a></font> AvgRespTime: %-10.2f     <font color=\"black\"> TimeSpan: %20s -- %20s       %s </font></span></li>\n",
 		$TCDesc_display,
                     $passCtr,
                     $failCtr,
@@ -950,48 +949,48 @@ my $str =<<EOF;
 
 
 REM create test_suit (test_suit)/test_case (tc) 
-taf.pl testsuit=_test_suit2_;create=_testcase1_/overwrite  
-taf.pl testsuit=_test_suit2_;create=_testcase2_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase3_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase4_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase5_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase6_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase1_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase2_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase3_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase4_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase5_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase6_/overwrite
-taf.pl testsuit=_test_suit3_;create=_testcase1_/overwrite
+taf.pl testsuit=_testsuite2_;create=_testcase1_/overwrite  
+taf.pl testsuit=_testsuite2_;create=_testcase2_/overwrite
+taf.pl testsuit=_testsuite2_;create=_testcase3_/overwrite
+taf.pl testsuit=_testsuite2_;create=_testcase4_/overwrite
+taf.pl testsuit=_testsuite2_;create=_testcase5_/overwrite
+taf.pl testsuit=_testsuite2_;create=_testcase6_/overwrite
+taf.pl testsuit=_testsuite1_;create=_testcase1_/overwrite
+taf.pl testsuit=_testsuite1_;create=_testcase2_/overwrite
+taf.pl testsuit=_testsuite1_;create=_testcase3_/overwrite
+taf.pl testsuit=_testsuite1_;create=_testcase4_/overwrite
+taf.pl testsuit=_testsuite1_;create=_testcase5_/overwrite
+taf.pl testsuit=_testsuite1_;create=_testcase6_/overwrite
+taf.pl testsuit=_testsuite3_;create=_testcase1_/overwrite
 
 REM performance test 
-taf.pl test_suit=_test_suit3_;create=_testcase2_/overwrite,perf
+taf.pl test_suit=_testsuite3_;create=_testcase2_/overwrite,perf
 REM Failed Functional test 
-taf.pl testsuit=_test_suit3_;create=_testcase3_/overwrite,fail
-taf.pl testsuit=_test_suit3_;create=_testcase4_/overwrite
-taf.pl testsuit=_test_suit3_;create=_testcase5_/overwrite,fail
+taf.pl testsuit=_testsuite3_;create=_testcase3_/overwrite,fail
+taf.pl testsuit=_testsuite3_;create=_testcase4_/overwrite
+taf.pl testsuit=_testsuite3_;create=_testcase5_/overwrite,fail
 REM functional test /w log
-taf.pl testsuit=_test_suit3_;create=_testcase6_/overwrite,genLog
+taf.pl testsuit=_testsuite3_;create=_testcase6_/overwrite,genLog
 
 taf.pl -prTestSuitProperty
 
 REM exec all test_suit under test_suit (test_suit)
-taf.pl testsuit=_test_suit1_;exec
-taf.pl testsuit=_test_suit1_;testcase=*;exec
-taf.pl testsuit=_test_suit1_;testcase=testcase1*;exec
+taf.pl testsuit=_testsuite1_;exec
+taf.pl testsuit=_testsuite1_;testcase=*;exec
+taf.pl testsuit=_testsuite1_;testcase=testcase1*;exec
 
-taf.pl testsuit=_test_suit2_;exec
-taf.pl testsuit=_test_suit3_;exec
+taf.pl testsuit=_testsuite2_;exec
+taf.pl testsuit=_testsuite3_;exec
 
 REM Seting the moving bar for showing test-in-prog status
-taf.pl testsuit=_test_suit3_;updateWeb=_testcase1_/2
-taf.pl testsuit=_test_suit3_;updateWeb=_testcase2_/1
-taf.pl testsuit=_test_suit3_;updateWeb=_testcase3_/3
+taf.pl testsuit=_testsuite3_;updateWeb=_testcase1_/2
+taf.pl testsuit=_testsuite3_;updateWeb=_testcase2_/1
+taf.pl testsuit=_testsuite3_;updateWeb=_testcase3_/3
 taf.pl delete=c:/_TAF/_test_suit1_
 
 REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:c:/tmp/purge.pl_space_1:customTC'
 
-\@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\_TAF\\_test_suit3_\\index.htm"
+\@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\_TAF\\_testsuite3_\\index.htm"
 
 
 EOF
@@ -999,19 +998,22 @@ EOF
 	print Fout $str;
 	close Fout;
 	print " --> taf.bat\n";
-	my $cmd = 'taf.bat'; system $cmd;
+	# my $cmd = 'taf.bat'; system $cmd;
+	my $cmd = 'taf.bat'; exec $cmd;
 	}
+	1;
 }
+
 sub prTestSuitProperty {
-open Fout, ">c:/_TAF/_test_suit3_/tsProperty.txt";
+open Fout, ">c:/_TAF/_testsuite3_/tsProperty.txt";
 my $str = <<EOF;
 web_ui_title: Test Automation Framework : web_ui_title
-c:/_TAF/_test_suit3_/_testcase1_| 1  Test case 1 description                            Manual edit please     
-c:/_TAF/_test_suit3_/_testcase2_| 2  Test case 2 description for tsProperty.txt         Manual edit please     
-c:/_TAF/_test_suit3_/_testcase3_| 3  Test case 3 description for .. tsProperty.txt      Manual edit please     
-c:/_TAF/_test_suit3_/_testcase4_| 4  Test case 4 description for ... tsProperty.txt     Manual edit please     
-c:/_TAF/_test_suit3_/_testcase5_| 5  Test case 5 description for .... tsProperty.txt    Manual edit please     
-c:/_TAF/_test_suit3_/_testcase6_| 6  Test case 6 description for ..... tsProperty.txt   Manual edit please     
+c:/_TAF/_testsuite3_/_testcase1_| 1  Test case 1 description                            Manual edit please     
+c:/_TAF/_testsuite3_/_testcase2_| 2  Test case 2 Perform TC  for tsProperty.txt         Manual edit please     
+c:/_TAF/_testsuite3_/_testcase3_| 3  Test case 3 Fail TC     for .. tsProperty.txt      Manual edit please     
+c:/_TAF/_testsuite3_/_testcase4_| 4  Test case 4 Pass TC     for ... tsProperty.txt     Manual edit please     
+c:/_TAF/_testsuite3_/_testcase5_| 5  Test case 5 Fail TC     for .... tsProperty.txt    Manual edit please     
+c:/_TAF/_testsuite3_/_testcase6_| 6  Test case 6 TC /w Log   for ..... tsProperty.txt   Manual edit please     
 EOF
 print Fout $str;
 close Fout
@@ -1130,7 +1132,8 @@ EOF
 
 	my $strTmp = sprintf "%-60s", "TC Name"; 
 	my $TCCtrToolTip = sprintf "Click to exec Test Suit"; 
-	my $tmp1 = sprintf("<a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
+	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
+	my $tmp1 = sprintf("<a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
 		
 my $tmp =<<EOF;
 

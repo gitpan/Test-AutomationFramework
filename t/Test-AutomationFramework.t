@@ -9,8 +9,8 @@ my $taf= 'taf.pl';
 my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
 
 	&test1_pre(); 
-	&test1_verify();
-     	&test1_verifyB();
+	&test1_verify(); 
+     	&test1_verifyB(); 
      	&test1_post(); 
 
 # Before `make install' is performed this script should be runnable with
@@ -57,7 +57,7 @@ sub regression4GlobalVars {
 	$TAF->setGlobalVars("SvrDrive=d:;SvrProjName=_testProj2_");
 	like ($TAF->getGlobalVars(), qr/_testProj2_/, $tcDesc.": set lobal Variables");
 	like ($TAF->getGlobalVars(), qr/d:/, $tcDesc.": set Global Variables");
-	$TAF->setGlobalVars("SvrDrive=c:;SvrProjName=_testSuit_");
+	$TAF->setGlobalVars("SvrDrive=c:/_TAF;SvrProjName=_testSuit_");
  	like ($TAF->getGlobalVars(), qr/_testSuit_/, $tcDesc.": get Global Variables - postProcess");
  	like ($TAF->getGlobalVars(), qr/c:/, $tcDesc.": get Global Variables - postProcess");
 }
@@ -70,7 +70,7 @@ sub regression4Property {
 	$TAF->processTCs("printVars");
     	$TAF->processTC("delete=$tcName"); 
 	$TAF->processTCs("printVars");
-    	$TAF->processTC("create=$tcName"); 
+	$TAF->processTC("create=$tcName"); 
 	$TAF->processTCs("printVars");
  #	------ add Property 
  	$TAF->processProperty($tcName,"add=addedProperty1:propVal1");
@@ -174,6 +174,8 @@ sub regression4Property {
  	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (modify=prop:value) - unlike";
  	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": processProperty modify Property");
  	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": processProperty modify Property");
+	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (add=prop:value) ";
+	$TAF->processTC("delete=$tcName"); 
 }
 
 sub regression4TC {
