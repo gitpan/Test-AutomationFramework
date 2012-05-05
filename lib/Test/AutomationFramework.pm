@@ -8,6 +8,7 @@ use Test::More;
 use Getopt::Long;
 use File::Copy;
 use File::Find;
+use Cwd;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 require Exporter;
 our @ISA = qw(Exporter);
@@ -24,10 +25,10 @@ genDriver
 );
 
 
-our $VERSION = '0.054.5';   
+our $VERSION = '0.057.0';   	# local run version and /o IIS 
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
-	my $tcNamePattern	= "TC*";
+	my $tcNamePattern	= "TC*";  
 	my $tsProperty    	= 'tsProperty.txt';
 	my $reportHtml  	= 'index.htm';
 	my $reportHtml1 	= '_tcReport_.html';
@@ -42,8 +43,9 @@ our $VERSION = '0.054.5';
 	my $tcOp= 'list';	
  	my $pr2Screen = 1;
 	my $SvrLogDir = ''.$SvrProjName.'';
-
-
+	my $url = 'file:///'.$SvrDrive;  
+	# my $url = "http://10.24.2.66/TAF";  # Local or IIS 
+	
 sub new { my $package = shift;
 	return bless({}, $package);
 }
@@ -113,6 +115,32 @@ sub tcPost {
 	&prHtml2();
 	########################################################
 } 
+
+
+sub generateRootIndex {
+open INDEX, ">$SvrDrive/index.htm"; 
+print INDEX<<EOF;
+<html><pre>
+<h2>Automated Test Suites on 10.24.2.66</h2>
+<ul>
+EOF
+find(sub { if ($File::Find::name =~ /index\.htm$/i) {
+			my $tmp = $File::Find::name; 
+			my $tmp2 = $File::Find::name; 
+			$tmp =~ s/$SvrDrive//;
+			$tmp2 =~ s/\/index.htm//g;
+			print INDEX "<li><a href=\"$url".$tmp."\">$tmp2</a>\n" if ($tmp ne "/index.htm");
+		}
+	 }, $SvrDrive);
+
+print INDEX <<EOF;
+</ul>
+</pre></html>
+<style type="text/css"> a { text-decoration:none} </style>
+EOF
+;
+close INDEX;
+}
 
 sub updateWeb {
 	my  %tsProperty;
@@ -351,7 +379,8 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 	my $TCCtrToolTip = sprintf "Click to exec TC (Avg Response Time %.2fs)", $avgResponseTime; 
 	my $TCScrollAmount = 0; my $CtrSeparator = "|";
 	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
-	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"file:\\\\\\$tcname\\_tcLog.html\" title=\"Click to see TC Logs\"> %-80s</a> <a href=\"file:///$SvrDrive/$SvrProjName/${reportHistoryHtml}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;testsuit=$SvrProjName;testcaseExec=$dirRoot;exec')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee width=48 direction=right behavior=alternate loop=10000 scrollamount=$TCScrollAmount>%-5d</marquee></a></font> AvgRespTime: %-10.2f     <font color=\"black\"> TimeSpan: %20s -- %20s       %s </font></span></li>\n",
+	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"${url}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"Click to see TC Logs\"> %-80s</a> <a href=\"${url}/$SvrProjName/${reportHistoryHtml}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;testsuit=$SvrProjName;testcaseExec=$dirRoot;exec')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee width=48 direction=right behavior=alternate loop=10000 scrollamount=$TCScrollAmount>%-5d</marquee></a></font> AvgRespTime: %-10.2f     <font color=\"black\"> TimeSpan: %20s -- %20s       %s </font></span></li>\n",
+
 		$TCDesc_display,
                     $passCtr,
                     $failCtr,
@@ -371,6 +400,7 @@ sub processTCs{
 	my $isBatchProcessing = 1;
 	my $tmp = shift;
 	@_ = split /;/, $tmp;
+	&genDriver_taf_pl ();
 	foreach my $each (@_) {
 		if ($each !~ /=/) {
 			$isBatchProcessing = 0;
@@ -490,7 +520,13 @@ sub createTC {
 		&createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"fail\\n\"; sleep 0; ");
 		} elsif ($cmd =~ /customTC/i) { # CustomTC
 		$cmd=~ /customTC:\s*(.+)\s*:customTC/; $cmd =$1; $cmd =~ s/_space_/ /;
-		&createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print `$cmd`;");
+		&createFile( $tcName.'\\'.'tc.pl', 
+"
+use File::Copy;\n\$| = 1;
+if (-e \"".&getDir($cmd)."\/_tcLogAppend.txt\" ) {move(\"".&getDir($cmd)."\/_tcLogAppend.txt\", \"".&getDir($cmd)."\/_tcLogAppend.bak\");}
+print `$cmd`;\nif (-e \"".&getDir($cmd)."\/_tcLogAppend.txt\" ) {move(\"".&getDir($cmd)."\/_tcLogAppend.txt\", \"$tcName\/_tcLogAppend.txt\");}
+"
+		);
 		} else {
 			 &createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"pass\\n\"; sleep 0; ");
 		}
@@ -565,6 +601,11 @@ sub getTCName {
 	}
 }
 
+sub getTCNameStr{
+	my $SvrTCNameStr = shift;
+	@_ = split /\\|\//, $SvrTCNameStr; 
+	pop;
+}
 sub tcAvgResponseTime { # absolete
 		my $tcname = shift; if ($tcname) {;} else {print "tcAvgResponseTime lack TCname\n";}
  		my $rst= &reportTC1(&getTCName($tcname),"","history")."\n";				
@@ -883,9 +924,132 @@ sub setGlobalVars {
 }
 
 
+sub runPowershell {
+my $cmd = shift; 
+if ($cmd =~ /\.ps1\s*$/) { $cmd = "powershell $cmd";}
+return `$cmd`;
+}
+
+sub generateTestsuite { 						# from index.pl
+my $cmd = getcwd(); 
+	if (-e "$cmd\/index.pl")     { $cmd = $cmd . "\/index.pl";}
+	elsif (-e "$cmd\/index.ps1") { $cmd = $cmd . "\/index.ps1";}
+	else  { 
+		open Fout, "> $cmd/index.pl";
+print Fout<<EOF_;
+
+if (\$ARGV[0]) { 
+	if (\$ARGV[0] == 1) { print "pass"; } # <<< plug in the test case 1 here e.g. print `index.pl 1` ; >>>
+	if (\$ARGV[0] == 2) { print "pass"; } # <<< plug in the test case 2 here e.g. print `index.pl 2`>>>
+	if (\$ARGV[0] == 3) { print "pass"; } # <<< plug in the test case 3 here e.g. print `index.pl 3`>>>
+	if (\$ARGV[0] == 4) { print "pass"; } # <<< plug in the test case 4 here e.g. print `index.pl 4`>>>
+	if (\$ARGV[0] == 5) { print "pass"; } # <<< plug in the test case 5 here e.g. print `index.pl 5`>>>
+	if (\$ARGV[0] == 6) { print "pass"; } # <<< plug in the test case 6 here e.g. print `index.pl 6`>>>
+} else {
+print \<\<EOF;
+_testsuiteName_: _testsuite_
+1. Test case description 1 for testing the function 1 <<< Please modify 
+2. Test case description 2 for testing the function 2 <<< Please modify
+3. Test case description 3 for testing the function 3 <<< Please modify
+4. Test case description 4 for testing the function 4 <<< Please modify
+5. Test case description 5 for testing the function 5 <<< Please modify
+6. Test case description 6 for testing the function 6 <<< Please modify
+EOF
+;
+}
+
+EOF_
+		close Fout;
+		print "[Warning] [".getcwd()."] directory does not have test suite hook. A temporial index.pl is created. Please edit it for the test sutie.\n"; ; 
+$cmd = $cmd . "\/index.pl";
+	}
+
+$cmd = shift if @_;
+my $testsuiteName="_default_testsuite_";
+my $testsuitePropertyFName='tsProperty.txt';
+my $testDriverName = $cmd;
+my $tsPropertyStr = "web_ui_title: ";
+my $tcCtr=1;
+my $TAF= $SvrDrive ;
+foreach my $each (split "\n", &runPowershell($cmd)) {	# get testsuiteName _testsuitename_: (\w+)and _testdrivername_: (\w+)
+	if    ($each =~ /_testsuitename_/i)  { $each =~ /_testsuitename_\s*:\s*(\S+)\s*$/i;	$testsuiteName  = $1; }
+	elsif ($each =~ /_testdrivername_/i) { $each =~ /_testdrivername_\s*:\s*(\S+)\s*$/i; 	$testDriverName = $1; }
+	else { ; }
+}
+print " <--$cmd            (_testsuitename_: [$testsuiteName] and _testdrivername_: [$testDriverName] ... tcDesc     ";
+$tcCtr=1; $tsPropertyStr = $tsPropertyStr . " $testsuiteName : web_ui_title\n";
+foreach my $each (split "\n", &runPowershell($cmd)) { # get testsuitePropertyString
+	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(\S+)\s*$/i;	$testsuiteName  = $1; }
+	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(\S+)\s*$/i; 	$testDriverName = $1; }
+	else { $tsPropertyStr = $tsPropertyStr . sprintf "$TAF\/$testsuiteName\/testcase%04d\|$tcCtr  $each\n", $tcCtr++;}
+}
+$tcCtr=1;
+foreach my $each (split "\n", &runPowershell($cmd)) { # create testsuite/testcase
+	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(\S+)\s*$/i;	$testsuiteName  = $1; }
+	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(\S+)\s*$/i; 	$testDriverName = $1; }
+	else { my $cmd = sprintf "taf.pl testsuit=$testsuiteName;create=testcase%04d/overwrite,customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++; `$cmd`; }
+}
+
+open Fout, ">>$TAF\/$testsuiteName\/$testsuitePropertyFName" || die "Can't create file\n"; print Fout $tsPropertyStr; close Fout;
+print " -->$TAF\/$testsuiteName\/$testsuitePropertyFName";
+$cmd = sprintf "taf.pl testsuit=$testsuiteName\;list";  `$cmd`;
+&generateRootIndex();
+system ("C:/Program Files/Internet Explorer/iexplore.exe", "C:/_TAF/$testsuiteName/index.htm");
+}
+
 sub help {
 if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+	&genDriver_taf_pl ();
 
+my $help=<<EOF;
+-----------------------------------------------------------------------------------------------------------------------
+	Test::AutomationFramework - Test Automation Framework  (TAF)
+
+	TAF manages automated test cases regarding test setup, test query, test execution and 
+	test reult reportings without any programming nor reading user manual. Any above operations
+	can be done with *ONE* mouse click.
+
+
+	TAF interfaces with the automated *test case* by [c:]/_TAF/[test_suite]/[test_case]/tc.pl
+
+		tc.pl  returns Pass|fail|numerical number in seconds
+		tc.pl  creates tc's log file as [c:]/[test_suite]/[test_case]/_appendLog.txt 
+		taf.pl creates test suite's webUI at [c:]/[test_suite]/index.htm 
+
+	TAF interfaces with the automated *test suite* by test suite ./driver index.pl or ./index.ps1 
+		taf.pl generateTestsuite
+
+	TAF installation 
+
+	1. Install Test::AutomationFramework from CPAN   (Perl -MCPAN -e "install Test::AutomationFramework)
+	2. DOS>perl -MTest::AutomationFramework -e "install"                   (Ensure taf.pl is in %PATHT%)
+	3. A WebUI is created, which can display and execute, as well as view test case by *ONE* mouse click
+		                               (open c:\\_TAF\\[test_suite]\\[test_case]\\index.htm with IE)
+	4. Modify ./taf.bat to define the test suit structure, which maps to the automated test cases
+	5. Modify c:/_TAF/[test_suite]/tsProperty.txt to define the webUI's test description
+	6. Modify c:/_TAF/[test_suit]/[test_case]/tc.pl to plug-in the automated test case
+	7. Execute taf.bat to create the test suit structure and start the webUI
+	8. TAF usages:  	1. Exec test cases 		      	  	  (click pass|fail counters)
+				2. Exec test suite 		            (click title pass|fail counters)
+				3. View historical pass/fail 	                           (click Pass|Fail) 
+				4. View historical logs		                           (click Test Desc) 
+
+
+	TAF usage examples: 
+
+	taf.pl -help 
+	taf.pl testsuit=testsuitA;list			List test cases of testsuitA
+	taf.pl testsuit=testsuitA;exec			Exec test cases of testsuitA
+	taf.pl install 
+	taf.pl generateTestsuite
+	taf.pl generateIndex
+	taf.pl helpmore
+-----------------------------------------------------------------------------------------------------------------------
+EOF
+	print $help;
+	&genDriver();
+}
+sub helpmore {
 my $help=<<EOF;
 -----------------------------------------------------------------------------------------------------------------------
 taf.pl testsuit=_ts1_;list 
@@ -923,19 +1087,21 @@ taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|d
 
 	taf.pl -processTCs create=tc1/fail,overwrite
 
-	Note: 
-	-------- c:/_TAF/_ts1_/tsProperty.txt ----------
-	web_ui_title: Purge Algorithm Test Cases - based on Tesbed : web_ui_title
-	c:/_TAF/purge_testbed/testcase01, 1  Purge Root Node                                             (purge Table11)
-	c:/_TAF/_ts1_/_tc1_ , test case 1 desc
-	c:/_TAF/_ts1_/_tc2_ , test case 2 desc
+	cwd/taf.pl generateTestsuite 
+	taf.pl generateRootIndex
+	taf.pl helpmore
 -----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
-	&genDriver();
-
 }
-
+sub genDriver_taf_pl {
+	if (-e "c:\/_TAF\/taf.pl") {;} else {
+	open Fout, ">c:\/_TAF\/taf.pl";
+	print Fout &prDriver(1);
+	close Fout;
+	print " --> c:\/_TAF\/taf.pl\n";
+	}
+}
 sub genDriver {
 	if (-e "taf.pl") {;} else {
 	open Fout, ">taf.pl";
@@ -998,8 +1164,8 @@ EOF
 	print Fout $str;
 	close Fout;
 	print " --> taf.bat\n";
-	# my $cmd = 'taf.bat'; system $cmd;
-	my $cmd = 'taf.bat'; exec $cmd;
+	my $cmd = 'taf.bat'; system $cmd;
+	# my $cmd = 'taf.bat'; exec $cmd;
 	}
 	1;
 }
@@ -1041,6 +1207,61 @@ foreach \$each (\@ARGV) {\$cmdLine =\$cmdLine.\$each.';'; } \$TAF->processTCs(\$
 
 EOF
 if (@_) { return $driver;} else { print $driver;}
+}
+
+sub install 
+{
+	if (getcwd =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from a directory.'; exit}
+	if (-e "taf.pl") {;} else { open Fout, ">taf.pl"; print Fout &prDriver(1); close Fout; print " --> taf.pl\n"; }
+	if (-e "taf.bat") {;} else {
+my $str =<<EOF;
+REM create test_suit (test_suit)/test_case (tc) 
+taf.pl testsuit=_test_suit2_;create=_testcase1_/overwrite  
+taf.pl testsuit=_test_suit2_;create=_testcase2_/overwrite
+taf.pl testsuit=_test_suit2_;create=_testcase3_/overwrite
+taf.pl testsuit=_test_suit2_;create=_testcase4_/overwrite
+taf.pl testsuit=_test_suit2_;create=_testcase5_/overwrite
+taf.pl testsuit=_test_suit2_;create=_testcase6_/overwrite
+taf.pl testsuit=_test_suit1_;create=_testcase1_/overwrite
+taf.pl testsuit=_test_suit1_;create=_testcase2_/overwrite
+taf.pl testsuit=_test_suit1_;create=_testcase3_/overwrite
+taf.pl testsuit=_test_suit1_;create=_testcase4_/overwrite
+taf.pl testsuit=_test_suit1_;create=_testcase5_/overwrite
+taf.pl testsuit=_test_suit1_;create=_testcase6_/overwrite
+taf.pl testsuit=_test_suit3_;create=_testcase1_/overwrite
+
+REM performance test 
+taf.pl test_suit=_test_suit3_;create=_testcase2_/overwrite,perf
+REM Failed Functional test 
+taf.pl testsuit=_test_suit3_;create=_testcase3_/overwrite,fail
+taf.pl testsuit=_test_suit3_;create=_testcase4_/overwrite
+taf.pl testsuit=_test_suit3_;create=_testcase5_/overwrite,fail
+REM functional test /w log
+taf.pl testsuit=_test_suit3_;create=_testcase6_/overwrite,genLog
+
+taf.pl -prTestSuitProperty
+
+REM exec all test_suit under test_suit (test_suit)
+taf.pl testsuit=_test_suit1_;exec
+taf.pl testsuit=_test_suit1_;testcase=*;exec
+taf.pl testsuit=_test_suit1_;testcase=testcase1*;exec
+
+taf.pl testsuit=_test_suit2_;exec
+taf.pl testsuit=_test_suit3_;exec
+
+REM Seting the moving bar for showing test-in-prog status
+taf.pl testsuit=_test_suit3_;updateWeb=_testcase1_/2
+taf.pl testsuit=_test_suit3_;updateWeb=_testcase2_/1
+taf.pl testsuit=_test_suit3_;updateWeb=_testcase3_/3
+taf.pl delete=c:/_TAF/_test_suit1_
+
+REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:c:/tmp/purge.pl_space_1:customTC'
+
+\@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\_TAF\\_test_suit3_\\index.htm"
+
+EOF
+	open Fout, ">taf.bat"; print Fout $str; close Fout; print " --> taf.bat\n"; my $cmd = 'taf.bat'; system $cmd;
+	}
 }
 
 
@@ -1133,7 +1354,8 @@ EOF
 	my $strTmp = sprintf "%-60s", "TC Name"; 
 	my $TCCtrToolTip = sprintf "Click to exec Test Suit"; 
 	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
-	my $tmp1 = sprintf("<a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
+	# my $tmp1 = sprintf("<a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
+	my $tmp1 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
 		
 my $tmp =<<EOF;
 
@@ -1299,30 +1521,30 @@ rem taf.pl listAll=test_suit1;exec
 rem taf.pl listAll=test_suit1;list
 
 
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase01/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_1:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase02/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_2:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase03/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_3:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase04/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_4:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase05/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_5:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase06/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_6:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase07/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_7:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase08/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_8:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase09/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_9:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase10/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_10:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase11/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_11:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase12/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_12:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase13/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_13:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase14/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_14:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase15/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_15:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase16/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_16:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase17/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_17:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase18/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_18:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase19/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_19:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase20/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_20:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase21/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_21:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase22/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_22:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase23/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_23:customTC'
-taf.pl 'testsuit=PropertyChangedEvent;create=testcase23/overwrite,customTC:c:/tmp/testPropertyChangedEvent.pl_space_23:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase01/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_1:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase02/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_2:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase03/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_3:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase04/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_4:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase05/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_5:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase06/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_6:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase07/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_7:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase08/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_8:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase09/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_9:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase10/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_10:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase11/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_11:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase12/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_12:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase13/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_13:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase14/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_14:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase15/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_15:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase16/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_16:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase17/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_17:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase18/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_18:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase19/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_19:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase20/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_20:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase21/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_21:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase22/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_22:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase23/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_23:customTC'
+taf.pl 'testsuit=_default_testsuite_;create=testcase23/overwrite,customTC:c:/tmp/test_default_testsuite_.pl_space_23:customTC'
 
 taf.pl testsuit=propertyChangedEvent;list
 rem taf.pl testsuit=propertyChangedEvent;exec
