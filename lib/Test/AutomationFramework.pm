@@ -25,7 +25,7 @@ genDriver
 );
 
 
-our $VERSION = '0.057.0';   	# local run version and /o IIS 
+our $VERSION = '0.057.1';   	# local run version and /o IIS 
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";  
@@ -44,6 +44,7 @@ our $VERSION = '0.057.0';   	# local run version and /o IIS
  	my $pr2Screen = 1;
 	my $SvrLogDir = ''.$SvrProjName.'';
 	my $url = 'file:///'.$SvrDrive;  
+	my $webUI_TCDescWidth = 75;
 	# my $url = "http://10.24.2.66/TAF";  # Local or IIS 
 	
 sub new { my $package = shift;
@@ -77,9 +78,9 @@ sub tcMain {
 				sleep $sleep4Display;
 				&updateWeb($eachTC,0);
 		    	}
- 			&logTC($eachTC);						# TC Logging
-			# &reportTC($eachTC,"","lastValue");				# TC Reporting	-> _tcReport_.html
- 			&reportTCHistory($eachTC);					# TC ReporHistory -> _tcReportHistory_.html
+ 			&logTC($eachTC);						# TC Logging		-> testcase/_tcLog.html	
+			# &reportTC($eachTC,"","lastValue");				# TC Reporting		-> _tcReport_.html
+ 			&reportTCHistory($eachTC);					# TC ReporHistory 	-> _tcReportHistory_.html
 		}
 	}
 	return $returnValue;
@@ -101,7 +102,7 @@ sub recursiveSearchtcMain() {
 			sleep $sleep4Display;
 			&updateWeb(&getDir($File::Find::name),0);
 		}
- 		&logTC($eachTC);						# TC Logging
+ 		&logTC($eachTC);						# TC Logging	-> 
 		# &reportTC($eachTC,"","lastValue");				# TC Reporting	-> _tcReport_.html
  		&reportTCHistory($eachTC);					# TC ReporHistory -> _tcReportHistory_.html
 		#}	# Property Filter 
@@ -519,14 +520,31 @@ sub createTC {
 		} elsif ($cmd =~ /Fail/i) { # FailedTC
 		&createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"fail\\n\"; sleep 0; ");
 		} elsif ($cmd =~ /customTC/i) { # CustomTC
-		$cmd=~ /customTC:\s*(.+)\s*:customTC/; $cmd =$1; $cmd =~ s/_space_/ /;
-		&createFile( $tcName.'\\'.'tc.pl', 
+			$cmd=~ /customTC:\s*(.+)\s*:customTC/; $cmd =$1; $cmd =~ s/_space_/ /;
+
+			if ($cmd =~ /ps1\s*/) {	# Powershell plugin
+			###########
+			&createFile( $tcName.'\\'.'tc.pl', 
+"
+use File::Copy;\n\$| = 1;
+if (-e \"".&getDir($cmd)."\/_tcLogAppend.txt\" ) {move(\"".&getDir($cmd)."\/_tcLogAppend.txt\", \"".&getDir($cmd)."\/_tcLogAppend.bak\");}
+print `powershell -file $cmd`;\nif (-e \"".&getDir($cmd)."\/_tcLogAppend.txt\" ) {move(\"".&getDir($cmd)."\/_tcLogAppend.txt\", \"$tcName\/_tcLogAppend.txt\");}
+"
+			);
+			###########
+			} else { 		# perl plugin
+			###########
+			&createFile( $tcName.'\\'.'tc.pl', 
 "
 use File::Copy;\n\$| = 1;
 if (-e \"".&getDir($cmd)."\/_tcLogAppend.txt\" ) {move(\"".&getDir($cmd)."\/_tcLogAppend.txt\", \"".&getDir($cmd)."\/_tcLogAppend.bak\");}
 print `$cmd`;\nif (-e \"".&getDir($cmd)."\/_tcLogAppend.txt\" ) {move(\"".&getDir($cmd)."\/_tcLogAppend.txt\", \"$tcName\/_tcLogAppend.txt\");}
 "
-		);
+			);
+			###########
+			}
+
+
 		} else {
 			 &createFile( $tcName.'\\'.'tc.pl', "\$| = 1; print \"pass\\n\"; sleep 0; ");
 		}
@@ -926,7 +944,7 @@ sub setGlobalVars {
 
 sub runPowershell {
 my $cmd = shift; 
-if ($cmd =~ /\.ps1\s*$/) { $cmd = "powershell $cmd";}
+if ($cmd =~ /.ps1\s*$/) { $cmd = "$cmd";}
 return `$cmd`;
 }
 
@@ -947,7 +965,7 @@ if (\$ARGV[0]) {
 	if (\$ARGV[0] == 6) { print "pass"; } # <<< plug in the test case 6 here e.g. print `index.pl 6`>>>
 } else {
 print \<\<EOF;
-_testsuiteName_: _testsuite_
+_testsuiteName_: _testsuiteTemplate_
 1. Test case description 1 for testing the function 1 <<< Please modify 
 2. Test case description 2 for testing the function 2 <<< Please modify
 3. Test case description 3 for testing the function 3 <<< Please modify
@@ -971,27 +989,33 @@ my $testDriverName = $cmd;
 my $tsPropertyStr = "web_ui_title: ";
 my $tcCtr=1;
 my $TAF= $SvrDrive ;
+if ($cmd =~ /\.ps1\s*$/) { $cmd = "powershell -file ". $cmd; }
 foreach my $each (split "\n", &runPowershell($cmd)) {	# get testsuiteName _testsuitename_: (\w+)and _testdrivername_: (\w+)
-	if    ($each =~ /_testsuitename_/i)  { $each =~ /_testsuitename_\s*:\s*(\S+)\s*$/i;	$testsuiteName  = $1; }
-	elsif ($each =~ /_testdrivername_/i) { $each =~ /_testdrivername_\s*:\s*(\S+)\s*$/i; 	$testDriverName = $1; }
+	if    ($each =~ /_testsuitename_/i)  { $each =~ /_testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; if ($testsuiteName =~ /\s/) { print "white space in testsuitename\n";exit; }}
+	elsif ($each =~ /_testdrivername_/i) { $each =~ /_testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
 	else { ; }
 }
 print " <--$cmd            (_testsuitename_: [$testsuiteName] and _testdrivername_: [$testDriverName] ... tcDesc     ";
 $tcCtr=1; $tsPropertyStr = $tsPropertyStr . " $testsuiteName : web_ui_title\n";
 foreach my $each (split "\n", &runPowershell($cmd)) { # get testsuitePropertyString
-	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(\S+)\s*$/i;	$testsuiteName  = $1; }
-	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(\S+)\s*$/i; 	$testDriverName = $1; }
-	else { $tsPropertyStr = $tsPropertyStr . sprintf "$TAF\/$testsuiteName\/testcase%04d\|$tcCtr  $each\n", $tcCtr++;}
+	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; }
+	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
+	elsif ($each =~ /^\s*\n/i) { ; }
+	elsif ($each =~ /^\s*$/i) { ; }
+	else { $tsPropertyStr = $tsPropertyStr . sprintf "$TAF\/$testsuiteName\/testcase%04d\|%4d  %-60s\n", $tcCtr, $tcCtr, substr $each, 0, $webUI_TCDescWidth; $tcCtr++;} 
 }
 $tcCtr=1;
 foreach my $each (split "\n", &runPowershell($cmd)) { # create testsuite/testcase
-	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(\S+)\s*$/i;	$testsuiteName  = $1; }
-	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(\S+)\s*$/i; 	$testDriverName = $1; }
+	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; }
+	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
+	elsif ($each =~ /^\s*\n/i) { ; }
+	elsif ($each =~ /^\s*$/i) { ; }
 	else { my $cmd = sprintf "taf.pl testsuit=$testsuiteName;create=testcase%04d/overwrite,customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++; `$cmd`; }
 }
 
+
 open Fout, ">>$TAF\/$testsuiteName\/$testsuitePropertyFName" || die "Can't create file\n"; print Fout $tsPropertyStr; close Fout;
-print " -->$TAF\/$testsuiteName\/$testsuitePropertyFName";
+print    " -->$TAF\/$testsuiteName\/$testsuitePropertyFName";
 $cmd = sprintf "taf.pl testsuit=$testsuiteName\;list";  `$cmd`;
 &generateRootIndex();
 system ("C:/Program Files/Internet Explorer/iexplore.exe", "C:/_TAF/$testsuiteName/index.htm");
@@ -1130,7 +1154,7 @@ taf.pl testsuit=_testsuite1_;create=_testcase6_/overwrite
 taf.pl testsuit=_testsuite3_;create=_testcase1_/overwrite
 
 REM performance test 
-taf.pl test_suit=_testsuite3_;create=_testcase2_/overwrite,perf
+taf.pl testsuit=_testsuite3_;create=_testcase2_/overwrite,perf
 REM Failed Functional test 
 taf.pl testsuit=_testsuite3_;create=_testcase3_/overwrite,fail
 taf.pl testsuit=_testsuite3_;create=_testcase4_/overwrite
@@ -1342,7 +1366,7 @@ sub getRoot { my $string = shift; @_ = split /\\|\//, $string; return $_[$#_]; }
 sub getDir  { my $string = shift; my $root =&getRoot($string); $string =~ s/([\\|\/])?$root//i; return $string;  }
 
 
-sub prHtml1 {
+sub prHtml1 {		# print index.htm beginnings
 &createFile( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, '' );
 my $str =<<EOF;
 taf.pl       : TAF Driver    
@@ -1354,7 +1378,6 @@ EOF
 	my $strTmp = sprintf "%-60s", "TC Name"; 
 	my $TCCtrToolTip = sprintf "Click to exec Test Suit"; 
 	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
-	# my $tmp1 = sprintf("<a href=\"file:///$SvrDrive/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
 	my $tmp1 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" </a> ");
 		
 my $tmp =<<EOF;
@@ -1390,7 +1413,7 @@ EOF
 &appendtoFile ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $tmp);
 }
 
-sub prHtml2 {
+sub prHtml2 {	# print index.htm endings
 my $tmp =<<EOF;
 </pre></body>
 </html>
@@ -1463,6 +1486,8 @@ TH:Generic Functions     getCtr                   Get Ctr                       
 TH:Generic Functions     getCurrentTime           TH:Generic Functions: getCurrentTime                                Commented 
 TH:Generic Functions     getHost                  getHost function done by SZ Team Charlie and David                  Commented 
 TH:Generic Functions     getHostFromIP            Get Host done by SZ Team Charlie and David                          Commented               
+
+todo: taf.pl hardcoded.
 ------------------------------------------------------------------------------------------
 
 
