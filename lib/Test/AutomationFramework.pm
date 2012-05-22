@@ -25,7 +25,7 @@ genDriver
 );
 
 
-our $VERSION = '0.057.1';   	# local run version and /o IIS 
+our $VERSION = '0.057.2';   	# local run version and /o IIS 
 	my %tsProperty;my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";  

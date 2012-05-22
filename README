@@ -1,4 +1,4 @@
-Test-AutomationFramework version 0.053
+Test-AutomationFramework version 0.057.2
 =====================================
 
 Test::AutomaitonFramework (TAF) is a Perl Win32/64 module to assist Test Automation by:
@@ -10,36 +10,41 @@ Test::AutomaitonFramework (TAF) is a Perl Win32/64 module to assist Test Automat
 	5. Support Win32/IE 							(This is the tested environment)
 	6. Free software and free support
 
-INSTALLATION (Suggest to install Strawberry Perl, which has development utilities, like dmake.exe)
+TAF Installation: 
 
-To install this module type the following:
+	1. INSTALLATION (Suggest to install Strawberry Perl, which has development utilities, like dmake.exe)
 
-   cd c:\bin <- included in PATH environ variable 
-   perl -MCPAN -e "install Date::Manip" (for Strawberry Perl) or ppm install Date::Manip (for ActivePerl)
-   perl Makefile.PL
-   dmake
-   dmake test
-   dmake install
+	2. To install this module by perl -MCPAN -e "intall Test::AutomationFramework"
+	
+	   [Manual installation if the above step doesn't work 
+	   Download the Test-AutomationFramework.n.tar.gz file from CPAN and unzip 
+	   perl -MCPAN -e "install Date::Manip" (for Strawberry Perl) or ppm install Date::Manip (for ActivePerl)
+	   perl Makefile.PL
+	   dmake
+	   dmake test
+	   dmake install]
+
+	3. Test bed installation: perl -MCPAN -e "intall Test::AutomationFramework"
 
 Non-programming Usage:
 
-   1. Modify taf.bat to create the test structure
-   2. Execut taf.bat 
-   3. Modify c:\_TAF\_testsuit_\_testcase_\tc.pl (automated TC hook)
-   4. Modify c:\_TAF\_testsuit_\tsProperty.txt   (WebUI's Test Case Description )
-   5. Open   c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
-   6. Have fun with the TAF
+	1. Modify taf.bat 
+	2. Execut taf.bat 
+	3. Modify c:\_TAF\_testsuit_\_testcase_\tc.pl (automated TC hook)
+	4. Modify c:\_TAF\_testsuit_\tsProperty.txt   (WebUI's Test Case Description )
+	5. Open   c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
+	6. Have fun with the TAF
 
 DEPENDENCIES
-	
-This module requires these other modules and libraries:
-Date::Manip 	
-File::Path 
-Test::More 
-Getopt::Long 
-File::Copy 
-File::Find
-Cwd::getcwd
+
+	[FYI: This module requires these other modules and libraries:
+	Date::Manip 	
+	File::Path 
+	Test::More 
+	Getopt::Long 
+	File::Copy 
+	File::Find
+	Cwd::getcwd]
 
 Copyright 2012 by Yong Wang (ywangperl@gmail.com) 
 
