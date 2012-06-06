@@ -1,4 +1,4 @@
-Test-AutomationFramework version 0.057.2
+Test-AutomationFramework version 0.057.9
 =====================================
 
 Test::AutomaitonFramework (TAF) is a Perl Win32/64 module to assist Test Automation by:
@@ -12,9 +12,9 @@ Test::AutomaitonFramework (TAF) is a Perl Win32/64 module to assist Test Automat
 
 TAF Installation: 
 
-	1. INSTALLATION (Suggest to install Strawberry Perl, which has development utilities, like dmake.exe)
+	1. Strawberry Perl Installation from Internet
 
-	2. To install this module by perl -MCPAN -e "intall Test::AutomationFramework"
+	2. TAF Module Installation from Internet by perl -MCPAN -e "intall Test::AutomationFramework"
 	
 	   [Manual installation if the above step doesn't work 
 	   Download the Test-AutomationFramework.n.tar.gz file from CPAN and unzip 
@@ -28,12 +28,13 @@ TAF Installation:
 
 Non-programming Usage:
 
-	1. Modify taf.bat 
-	2. Execut taf.bat 
+	1. Modify c:\taf.bat 
+	2. Execut c:\taf.bat 
 	3. Modify c:\_TAF\_testsuit_\_testcase_\tc.pl (automated TC hook)
 	4. Modify c:\_TAF\_testsuit_\tsProperty.txt   (WebUI's Test Case Description )
-	5. Open   c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
-	6. Have fun with the TAF
+	5. Modify c:\_TAF\tsProperty.txt              (WebUI's Test Suite Description )
+	6. Open   c:\_TAF\_testsuit_\index.htm with IE  (WebUI to dispsplay, Start TC, record TC historical result/logs) 
+	7. Have fun with the TAF
 
 DEPENDENCIES
 
