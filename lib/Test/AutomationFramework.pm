@@ -25,7 +25,7 @@ genDriver
 );
 
 
-our $VERSION = '0.057.9';   	# local run version and /o IIS , support multiple TC Concurrency Control, Passed/FailedTC_html, generateTestsuite for pyAnvil, TC desc mouse-over, title mouse over
+our $VERSION = '0.057.10';   	# local run version and /o IIS , support multiple TC Concurrency Control, Passed/FailedTC_html, generateTestsuite for pyAnvil, TC desc mouse-over, title mouse over
 	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";  
@@ -47,9 +47,13 @@ our $VERSION = '0.057.9';   	# local run version and /o IIS , support multiple T
 	my $SvrTCNameExecPattern = ".".$SvrTCNamePattern;
 	my $tcOp		= 'list';	
  	my $pr2Screen 		= 1;
+
+	# my $ip 			= '10.24.5.19'; 
+ 	my $ip = 'localhost';
+
 	my $SvrLogDir 		= ''.$SvrProjName.'';
 	my $url 		= 'file:///'.$SvrDrive;  
-	my $urlHttp		= 'http://localhost/_TAF';
+	my $urlHttp		= 'http://'.$ip.'/_TAF';
 	my $webUI_TCDescWidth 	= 70;
 	my $scrollAmount	= 0; 
 	my $borderWidth		= 0; 
@@ -67,6 +71,7 @@ sub tcLoop {
 	return $returnValue;
 }
 sub tcPre {
+ 	if (-e $SvrDrive.'\\'.$SvrProjName) {;} else { print "$SvrDrive/$SvrProjName doesn't exist.\n"; exit; }
 	##################### PrePRocessor #####################
  	&createFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1,"");
  	&createFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtmlHistory,"");
@@ -89,7 +94,7 @@ sub recursiveSearchtcMain() {
 		&getWeb_($eachTC) =~ /borderStyle\s*=\s*(.+)/  ; $borderStyle  = $1; if ($borderStyle) {;} else {$borderStyle=0;}
 		if ($propertyOp !~ /^\s*$/) { printf "%20s\n", &processProperty($eachTC, $propertyOp); }  # PropertyManagement
 		elsif (($tcOp !~ /^\s*$/)&&($SvrTCName =~/$SvrTCNameExecPattern/))  { 			  # testcaseExec Filter
-			if ($scrollAmount ==0 and $borderWidth ==0) { 					   # TC Execution
+			if ($scrollAmount ==0 and $borderWidth ==0) { 					  # TC Execution
 				&updateWeb_(&getDir($File::Find::name),1, $borderWidth, "SOLID");
 				$returnValue = $returnValue. &processTC("","$tcOp=$eachTC",$pr2Screen)."\n"; 
 				sleep $sleep4Display;
@@ -202,10 +207,22 @@ sub getTestsuiteTotalExecTime {
 		while ($_ = <FinTS>) { if ($_ =~ /^\s*<li\s+style="color:/i) { $_ =~ /(\d+)\s*\(s\)/; $tsTotalExecTime = $tsTotalExecTime + $1;} }
 		close FinTS;
 		} 
-	return $tsTotalExecTime;
+	return &timeConvert($tsTotalExecTime); 
+# 	my $hr  = int ($tsTotalExecTime/3600); 
+#   	my $min = int (($tsTotalExecTime - $hr*3600) / 60);
+#   	my $sec = int (($tsTotalExecTime - $hr*3600 - $min * 60));
+#	$tsTotalExecTime = sprintf "%02d:%02d:%02d",$hr,$min,$sec;
+#	return $tsTotalExecTime;
 }
 
 ####################### get Testsuite Total Exec Time 
+sub timeConvert {
+	my $totalTime = shift; 
+	my $hr  = int ($totalTime/3600); 
+	my $min = int (($totalTime - $hr*3600) / 60);
+	my $sec = int (($totalTime - $hr*3600 - $min * 60));
+	$totalTime = sprintf "%02d:%02d:%02d",$hr,$min,$sec;
+}
 
 #######################generateFailedTCHtml {
 sub createTestsuitePassFailedHtml {
@@ -491,7 +508,12 @@ sub logTC {		# 	Update TC Log on webUI (TH:WebUI)
 
 
 		######## add html tags to $fileText_ ####### 
-		# $fileText_ = &addURL ($fileText_); 
+		# print "pa: $fileText, $fileText_\n";
+		#if ($fileText_) {
+		#$fileText_ = &addUrl ($fileText_); 
+		#print "pb: $fileText_\n";
+		#}
+
 		######## add html tags to $fileText_ ####### 
 
 
@@ -668,7 +690,8 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
     my $timeSpan  = "2000!now"; 
     my $tcname          = $_[0]; my $propertyPattern = $_[1]; my $reportType = $_[2]; 
     $tcname = &getTCName($tcname);
-    my ($timeSpanStart, $timeSpanEnd, $isInSpan, $returnValue, $beautifiedStr, $beautifiedStr4Web); 
+    my ($timeSpanStart, $timeSpanEnd, $isInSpan, $beautifiedStr, $beautifiedStr4Web); 
+    my $returnValue="";
     my ($propertyName, $startTime, $endTime, $comment1, $comment2) ;
     my $passCtr =0; my $failCtr = 0; my $totalTime=0; my $avgResponseTime; my $propertyValue ='';
     my $totalTimeDummy;
@@ -683,6 +706,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
     }
 
     open Fin, "$tcname/thProperty.txt" || die "Can't open file:$!"; 	################## Read Property File
+    ############################## Read Property File to update reportHtmlHistory ###########################
     while ( $_ = <Fin> ) { chop;
          if ( $_ =~ /$propertyPattern/i ) {
                 ( $propertyName, $propertyValue, $startTime, $endTime, $totalTimeDummy, $comment1, $comment2) = split( '\|', $_);
@@ -703,7 +727,8 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
                  	$beautifiedStr = $_;
              	 }    # endif for /tcRunResult/
                  if ( $reportType =~ /history/i ) {    		# return property history
-                     $returnValue .= "$beautifiedStr\n";
+			 # $returnValue .= "$beautifiedStr\n";
+                     $returnValue = "$beautifiedStr\n$returnValue";
                  }
                  elsif ( $reportType =~ /lastValue/i ) {    	# returen last property
                      $returnValue = $beautifiedStr;
@@ -714,6 +739,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 	     } # endif for InSpan
          }    # endif for /propertyPattern/
     }									##################### 
+    ############################## Read Property File to update reportHtmlHistory ###########################
 
     	if ($passCtr + $failCtr == 0) {				##########  Generate TC webUI string 
 	$avgResponseTime = 0; } else {
@@ -733,14 +759,11 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 		$TCDesc_display = sprintf "%-80s", substr $tsProperty{$tcname}, 0, 77; 
 		$TCDesc_displayTip = $tsProperty{$tcname}; 
 		}
-
-
-
-
 	} 
 	else { $TCDesc_display = sprintf "%-80s", $tcname; }
+	my $tcSerialN = $TCDesc_display; if ($tcSerialN =~ /^\s*\d+\s+/) {$tcSerialN =~ /^\s*(\d+)\s+/; $tcSerialN = "$1"; if ($tcSerialN) {;} else {$tcSerialN = "";}}
 	my $dirRoot = &getRoot($tcname); 
-	my $TCCtrToolTip = sprintf "Click to exec TC (Avg Response Time %.2fs)", $avgResponseTime; 
+	my $TCCtrToolTip = sprintf "Click to Run TC $tcSerialN (T = %s)", &timeConvert($avgResponseTime); 
 	my $TCScrollAmount = 0; my $CtrSeparator = "|";
 	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
 	my $tmp = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"${url}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\"> %-80s</a> <a href=\"${url}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;testsuit=$SvrProjName;testcaseExec=$dirRoot;exec')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>%-5d</marquee></a></font>  %6d(s) <font color=\"white\"> %s </font></span></li>\n",
@@ -754,7 +777,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
                 );
 
 	# http
-	my $tmp_http = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"${urlHttp}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\"> %-80s</a> <a href=\"${urlHttp}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://localhost/_TAF/$SvrProjName/$dirRoot/tc.hta\')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>%-5d</marquee></a></font>  %6d(s) <font color=\"white\"> %s </font></span></li>\n",
+	my $tmp_http = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"${urlHttp}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\"> %-80s</a> <a href=\"${urlHttp}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://$ip/_TAF/$SvrProjName/$dirRoot/tc.hta\')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>%-5d</marquee></a></font>  %6d(s) <font color=\"white\"> %s </font></span></li>\n",
 		$TCDesc_display,
                     $passCtr,
                     $failCtr,
@@ -872,9 +895,10 @@ sub processTC {
 		    $tcOP =~ s/\s*$//g;
 		    $rst = &deleteTC($tcname);
             } else {
+		    print "<- Test suite \n" if $prMsg;
 		return "_noProcessedTC_";
 	    }
-	     	printf " %s\n",  $rst  if $prMsg; # print for webUI 2/2
+	     	printf "%s\n",  $rst  if $prMsg; # print for webUI 2/2
 	 	$rst = sprintf "%20s: %-40s %s", "processTC", $tcname,  $rst ;
 		return $rst;
 }
@@ -905,8 +929,8 @@ sub createTC {
 	my $testsuite = $_[2]; my $testcase  = $_[3]; 
 	my $now = &UnixDate(&DateCalc("now","+ 6 seconds") , "%H:%M:%S" );
 
-	if ($testsuite) {;} else { print "[Info] \$testsuite is null. Note \$tcName = $tcName\n",}
-	if ($testcase ) {;} else { print "[Info] \$testcase  is null. Note \$tcName = $tcName\n",}
+	if ($testsuite) {;} else { print "[Info] \$testsuite is null. Note \$tcName = $tcName\n"; $testsuite ="";}
+	if ($testcase ) {;} else { print "[Info] \$testcase  is null. Note \$tcName = $tcName\n"; $testcase = "";}
 
 	# my $tcNameIIS = $tcName; $tcNameIIS =~ s/c:/c:\/inetpub\/wwwroot/; 
 	# my $tcNameIIS = $tcName; $tcNameIIS =~ s/c:/c:\/inetpub\/wwwroot/; $tcNameIIS =~ s/wwwroot\/_TAF/wwwroot\/_TAF_http/; 
@@ -1011,8 +1035,10 @@ if (-e \"".&getDir($cmd)."\/_tcLogAppend_.txt\" ) {move(\"".&getDir($cmd)."\/_tc
 
 		my $tmp =<<EOF;
 open Fout, '>$tcName\\_tcLogAppend.txt';
-print Fout "This is the exemplified append log file";
-print Fout "This is the exemplified url in <a href=\\"file:////c:/_TAF/blabla.Html\\" >url </a>";
+print Fout "* This is the content of TC log file\\n";
+print Fout "* TC Log can has URL pointed to <a href=\\"file:////c:/_TAF/blabla.html\\" >File Archieve</a>\\n";
+print Fout "* TC Log can has URL pointed to <a href=\\"file:////c:/_TAF/_testsuite2_/_testcase1_/_tcLog.html\\" >Another TC's Log</a>\\n ";
+print Fout "* TC Log can has URL pointed to <a href=\\"file:////c:/_TAF/index.htm\\" >TAF</a>\\n";
 close Fout;
 exit;
 EOF
@@ -1637,7 +1663,7 @@ if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"
 
 my $help=<<EOF;
 -----------------------------------------------------------------------------------------------------------------------
-	Test::AutomationFramework - Test Automation Framework  (TAF)	version:version:  $VERSION
+	Test::AutomationFramework - Test Automation Framework  (TAF)	version: $VERSION
 
 	TAF manages automated test cases regarding test setup, test query, test execution and 
 	test reult reportings without any programming nor reading user manual. Any above operations
@@ -2196,7 +2222,7 @@ _tcAppend.txt: TC log  hook
 EOF
 
 	my $strTmp = sprintf "%-60s", "Testcase Description"; 		#todo: Hardcoded 60 
-	my $TCCtrToolTip = sprintf "Click to exec Test Suite (Average Exec Time is $testsuiteTotalExecTime)"; 
+	my $TCCtrToolTip = sprintf "Click to Run Test Suite (Avg Time is $testsuiteTotalExecTime)"; 
 	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
 	my $tmp1 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;testsuit=$SvrProjName;exec')\"  title=\"$TCCtrToolTip\" > ");
 	my $tmp2 = sprintf("<a href=\"${url}/$SvrProjName/index_failed.htm\" title=\"Click to display *Failed* TCs\">");
@@ -2245,12 +2271,12 @@ my $tmp =<<EOF;
 <pre>
 <p>
 <h2> ${tmp8}$web_ui_title</a></h2> 
-<a title=\"latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Click Testcase Desc to view TC logs\">$strTmp</a>          -${tmp3}Pass</a>${tmp31}${tmp2}Fail</a>-  <a title=\"pass/fail counts\">${tmp1}Counters</a>  ${tmp7}Exec T</a> ${tmp6}         <a title=\"Manual command to exec TC\">   ${tmp4}  </span>
+<a title=\"Latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Click Testcase Desc to view TC logs\">$strTmp</a>          -${tmp3}Pass</a>${tmp31}${tmp2}Fail</a>-  <a title=\"pass/fail counts\">${tmp1}Counters</a>  ${tmp7}Exec T</a> ${tmp6}         <a title=\"Manual command to exec TC\">   ${tmp4}  </span>
 EOF
 
 &appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $tmp);
 
-my $tmp1_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://localhost/_TAF/$SvrProjName/ts.hta\')\"  title=\"$TCCtrToolTip\" > "); 
+my $tmp1_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://$ip/_TAF/$SvrProjName/ts.hta\')\"  title=\"$TCCtrToolTip\" > "); 
 my $tmp2_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_failed.htm\" title=\"Click to display *Failed* TCs\">"); 
 my $tmp3_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_passed.htm\" title=\"Click to display *Passed* TCs\">");
 my $tmp31_http= sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_others.htm\" title=\"Click to display *Others* TCs\">/</a>");
@@ -2292,8 +2318,8 @@ my $tmp_http =<<EOF;
 <body>
 <pre>
 <p>
-<h2> ${tmp7_http}$web_ui_title</a> </h2>
-<a title=\"latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Click Testcase Descriptoin to view logs \">$strTmp</a>          -${tmp3_http}Pass</a>${tmp31_http}${tmp2_http}Fail</a>-  <a title=\"pass/fail counts\">${tmp1_http}Counters</a>  ${tmp7_http}Exec T</a> $tmp6_http     <a title=\"Manual command to exec TC\">     ${tmp4_http} </a> </span>
+<h2> $web_ui_title </h2>
+<a title=\"latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Click Testcase Descriptoin to view logs \">$strTmp</a>          -${tmp3_http}Pass</a>${tmp31_http}${tmp2_http}Fail</a>-  <a title=\"pass/fail counts\">${tmp1_http}Counters</a>  Exec T $tmp6_http     <a title=\"Manual command to exec TC\">     ${tmp4_http} </a> </span>
 EOF
 
 

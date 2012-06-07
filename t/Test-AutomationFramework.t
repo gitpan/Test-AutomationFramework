@@ -4,14 +4,14 @@
 use Test::AutomationFramework;
 
 my $cmd; my $rst; my $loaded = 1; my $tcName ; my $tcDesc ;  my $tcOp;
-my $taf= 'taf.pl';
+my $taf= 'c:/_TAF/taf.pl';
 ########################## End of black magic.
 my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
 
 	&test1_pre(); 
-	&test1_verify(); 
-     	&test1_verifyB(); 
-     	&test1_post(); 
+ 	&test1_verify(); 
+      	&test1_verifyB(); 
+      	&test1_post(); 
 
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl Test-AutomationFramework.t'
