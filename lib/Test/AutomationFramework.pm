@@ -22,11 +22,12 @@ processTCs
 processTC
 processProperty
 genDriver
+initTAF
 );
 
 
-our $VERSION = '0.057.10';   	# local run version and /o IIS , support multiple TC Concurrency Control, Passed/FailedTC_html, generateTestsuite for pyAnvil, TC desc mouse-over, title mouse over
-	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
+our $VERSION = '0.058.0';   	# local run version and /o IIS , support multiple TC Concurrency Control, Passed/FailedTC_html, generateTestsuite for pyAnvil, TC desc mouse-over, title mouse over
+	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 0; my $notUsegetTCName= 0;
 	my $scriptName = $0; $scriptName =~ s/\\/\\\\/g; my $web_ui_title="Test Automation Framework";
 	my $tcNamePattern	= "TC*";  
 	my $tsProperty    	= 'tsProperty.txt';
@@ -47,10 +48,9 @@ our $VERSION = '0.057.10';   	# local run version and /o IIS , support multiple 
 	my $SvrTCNameExecPattern = ".".$SvrTCNamePattern;
 	my $tcOp		= 'list';	
  	my $pr2Screen 		= 1;
-
+	my $workingDir		= getcwd(); 
 	# my $ip 			= '10.24.5.19'; 
  	my $ip = 'localhost';
-
 	my $SvrLogDir 		= ''.$SvrProjName.'';
 	my $url 		= 'file:///'.$SvrDrive;  
 	my $urlHttp		= 'http://'.$ip.'/_TAF';
@@ -126,15 +126,13 @@ sub recursiveSearchtcMain() {
 }
 sub tcPost {
 	##################### Post PRocessor ###################
-
  	&appendtoFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtmlHistory,"</pre></body></html>\n")				;
    	&mergeFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1)		;
    	&mergeFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http)	;
-	&prHtml1();
+	&prHtml1()			;
 	&appendtoFileFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1,      $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml)	;
 	&appendtoFileFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http);
-	&prHtml2();
-
+	&prHtml2()			;
 	&generateRootIndex       ()	; 
 	&updateTestsuiteHTA      ()	;
 	&updateTestsuitePassFail ()	;
@@ -149,14 +147,15 @@ sub generateRootIndex {					######### generate index.htm
 open INDEX, ">$SvrDrive/index.htm"; 
 print INDEX<<EOF;
 <html><pre>
-<h2>Automated Test Suites on 10.24.2.66</h2>
+<h2>Automated Test Suites on $ip</h2>
 <ul>
 EOF
 find(sub { if ($File::Find::name =~ /index\.htm$/i) {
-			my $tmp = $File::Find::name; 
+			my $tmp= $File::Find::name; 
 			my $tmp2 = $File::Find::name; 
-			$tmp =~ s/$SvrDrive//;
+			$tmp=~ s/$SvrDrive//;
 			$tmp2 =~ s/\/index.htm//g;
+			$tmp2 = &readWebTitle ($tmp2); 
 			if ($tafProperty{$tmp2} ) { $tmp2 = $tafProperty{$tmp2}; } 
 			print INDEX "<li><a href=\"$url".$tmp."\">$tmp2</a>\n" if ($tmp ne "/index.htm");
 		}
@@ -196,10 +195,21 @@ EOF
 close INDEX;
 	#### part 2 ####
 }
-#######################generateRootIndex {
+
+####################### read Testsuite web_ui_title
+sub readWebTitle{ 
+	my $dir = shift;  my %prop; my $webTitle = "Test Automation Framework";
+	if ( -e "$dir/tsProperty.txt") {
+	open Fin, "$dir/tsProperty.txt"; 
+	while ($_ =<Fin>) {
+		my $tmp=""; /(\s*)/; $_ =~ /^\s*(.+)\|/       ; $tmp = $1; $prop{$tmp}=$_; 
+		if ($_ =~ /web_ui_title\s*:\s*(.+)\s*:\s*web_ui_title/) {$webTitle = $1;}
+	} close Fin; 
+	}
+	return $webTitle;
+}
 
 ####################### get Testsuite Total Exec Time 
-
 sub getTestsuiteTotalExecTime {
 	my $index= shift; my $index_; my $tsTotalExecTime = 0;
 		if (-e $index) {
@@ -208,11 +218,6 @@ sub getTestsuiteTotalExecTime {
 		close FinTS;
 		} 
 	return &timeConvert($tsTotalExecTime); 
-# 	my $hr  = int ($tsTotalExecTime/3600); 
-#   	my $min = int (($tsTotalExecTime - $hr*3600) / 60);
-#   	my $sec = int (($tsTotalExecTime - $hr*3600 - $min * 60));
-#	$tsTotalExecTime = sprintf "%02d:%02d:%02d",$hr,$min,$sec;
-#	return $tsTotalExecTime;
 }
 
 ####################### get Testsuite Total Exec Time 
@@ -324,7 +329,7 @@ sub createTestsuitePassFailedHtml {
 	####################### other.htm #####################
 }
 
-#######################generateFailedTCHtml {
+#######################generateFailedTCHtml 
 
 
 sub updateWeb {
@@ -373,11 +378,8 @@ sub updateTestsuitePassFail {
 	}
 }
 
-
-
 sub createTestsuiteHTA {
 	my $tsDir = shift; @_ = split /\//, $tsDir; my $testsuite = $_[$#_];
-
 	&createFile_( $tsDir.'ts.hta', 
 "
 <html>
@@ -415,10 +417,23 @@ sub createTestsuiteHTA {
 <body onLoad =\"RunFileHTTP(\'$testsuite\', \'.*\')\">Run $testsuite\/ts.hta</button> <p>
 </body>
 </html>
-"
- 			);
+
+")
+;
 
 }	
+
+################################################################################
+#        
+################################################################################
+sub initTAF {
+	foreach my $each (split /\n/, `schtasks /query`) {
+		if ($each =~ /TAF_/i) {
+			$each =~ /^\s*(.+)\s+(\d+\/\d+\/\d+)\s+/;
+			my $processName = $1; my $cmd = "schtasks /delete /tn $processName /f"; `$cmd`;
+		}
+	}
+}
 
 ################################################################################
 #        
@@ -429,11 +444,12 @@ sub readTestSuitProperty {
 	open Fin, $SvrDrive.'/'.$SvrProjName.'/'."tsProperty.txt";
 	while ($_ = <Fin>) {
 		chop;
-		if ($web_ui_title =~ /Test Automation Framework/i) {
- 			if ($_ =~ /web_ui_title\s*:(.+):\s*web_ui_title/)  { 
+		#	if ($web_ui_title =~ /Test Automation Framework/i) {
+			# if ($_ =~ /web_ui_title\s*:\s*(.+):\s*web_ui_title/)  { 
+ 			if ($_ =~ /web_ui_title\s*:\s*(.+)\s*:\s*web_ui_title/)  { 
 			$web_ui_title = $1;
 			}
-		}
+			# }
 		my $tcname, my $tcdesc;
 		($tcname, $tcdesc) = split /[\|]/, $_;
 		if ($tcdesc) {
@@ -507,7 +523,7 @@ sub logTC {		# 	Update TC Log on webUI (TH:WebUI)
     		my $fileText_ = &readFile(&getTCLogFname_($tcname)); # for _tcLogAppendix_.txt (pyAnvil logs)
 
 
-		######## add html tags to $fileText_ ####### 
+		######## add html tags to $fileText_ #######  todo
 		# print "pa: $fileText, $fileText_\n";
 		#if ($fileText_) {
 		#$fileText_ = &addUrl ($fileText_); 
@@ -584,7 +600,6 @@ sub getTCLogFname	{    	# 	Determine if a log exists (TH:TC Report)
 	    );
 	my $mtimeLogWeb; 
 
-	# if (-e $tcName.'\\thProperty.txt' )
     if (-e $tcName.'/thProperty.txt' )
      {
 	    (
@@ -593,7 +608,6 @@ sub getTCLogFname	{    	# 	Determine if a log exists (TH:TC Report)
 	    ) = stat($tcName.'\\'.'thProperty.txt');
     }
 
-    # my $tcNameLog = $tcName."\\_tcLogAppend.txt";
     my $tcNameLog = $tcName."/_tcLogAppend.txt";
     if (-e $tcNameLog) {
 	    my (
@@ -603,7 +617,6 @@ sub getTCLogFname	{    	# 	Determine if a log exists (TH:TC Report)
 		if ($mtimePropertyFile - $mtimeLog>= 0 ) { return $tcNameLog; }
     }
 
-    # $tcNameLog = "$tcName\\_tcLog.txt";
     $tcNameLog = "$tcName/_tcLog.txt";
     if (-e $tcNameLog) {
 	    my (
@@ -612,13 +625,6 @@ sub getTCLogFname	{    	# 	Determine if a log exists (TH:TC Report)
 	    ) = stat($tcNameLog);
 	    if ( $mtimePropertyFile - $mtimeLog>= 2 ) { return $tcNameLog; }
     }
-
-#	todo: for IIS UI 
-#    $tcNameLog = "c:\\Inetpub\\wwwroot\\_tcLogs_\\$tcName.html";
-#    my (
-#        $dev,  $ino,   $mode,  $nlink, $uid,     $gid, $rdev,
-#        $size, $atime, $mtimeLog, $ctime, $blksize, $blocks/p;
-#    if ( -e $tcNameLog ) { return $tcNameLog; }
     return "noLog"; 
 }
 
@@ -654,13 +660,6 @@ sub getTCLogFname_	{    	# 	Determine if a log exists (TH:TC Report)
 	    ) = stat($tcNameLog);
 	    if ( $mtimePropertyFile - $mtimeLog>= 2 ) { return $tcNameLog; }
     }
-
-#	todo: for IIS UI 
-#    $tcNameLog = "c:\\Inetpub\\wwwroot\\_tcLogs_\\$tcName.html";
-#    my (
-#        $dev,  $ino,   $mode,  $nlink, $uid,     $gid, $rdev,
-#        $size, $atime, $mtimeLog, $ctime, $blksize, $blocks/p;
-#    if ( -e $tcNameLog ) { return $tcNameLog; }
     return "noLog"; 
 }
 
@@ -675,7 +674,6 @@ sub reportTCHistory {
 	&appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtmlHistory, " ---------------------- TestCase: <a name=\"".&getTCName($tcname)."\"> ".&getTCName($tcname)." </a>-----------------------\n");
 	&appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtmlHistory, $fileText);
 }
-
 
 ################################################################################
 #	Subroutine Name : reportTC
@@ -809,32 +807,31 @@ sub processTCs{
 	foreach my $each (@_) {
 		if ($each !~ /=/) {
 			$isBatchProcessing = 0;
-			if (($each =~ /\blistVars\b/i) || ($each =~ /\bgetVars\b/i)) { return &getGlobalVars();
-			} elsif ($each =~ /\bprintVars\b/i) { print &getGlobalVars(); next ;
-			} elsif ($each =~ /\bexec\b/i) { 	;
-				&setGlobalVars("","tcOP=exec")	;
-				$isBatchProcessing = 1		;
-			} elsif ($each =~ /\blist\b/i) { 	;
-				&setGlobalVars("","tcOP=list")	;
-				$isBatchProcessing = 1		;
-			} elsif ($each =~ /\blistAll\b/i) { 	;
-			 	$SvrTCNamePattern =".*";  &listAll(); 
-				$isBatchProcessing = 0		;		
+			if (($each =~ /\blistVars\b/i) || ($each =~ /\bgetVars\b/i)) { return &getGlobalVars()	;
+			} elsif ($each =~ /\bprintVars\b/i) { print &getGlobalVars(); next 			;
+			} elsif ($each =~ /\bexec\b/i) { 							;
+				&setGlobalVars("","tcOP=exec")							;
+				$isBatchProcessing = 1								;
+			} elsif ($each =~ /\blist\b/i) { 							;
+				&setGlobalVars("","tcOP=list")							;
+				$isBatchProcessing = 1								;
+			} elsif ($each =~ /\blistAll\b/i) { 							;
+			 	$SvrTCNamePattern =".*";  &listAll()						; 
+				$isBatchProcessing = 0								;		
 			} else  {
-				my $str =  "\&$each();"; my $rst = eval $str; next;  
+				my $str =  "\&$each();"; my $rst = eval $str; next				;  
 			}
 		} else {
-		$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/; my $varName = $1; my $varValue = $2;
-		if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
-			$isBatchProcessing = 1;
- 			if (&setGlobalVars ("","$varName=$varValue;") == 1 ) 		{ 
-				; }
-			else {
-				$isBatchProcessing = 0; my $rst = &processTC("",$each) ;
+			$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/; my $varName = $1; my $varValue = $2		;
+			if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
+				$isBatchProcessing = 1;
+				if (&setGlobalVars ("","$varName=$varValue;") == 1 ) 		{ ; }
+				else {
+					$isBatchProcessing = 0; my $rst = &processTC("",$each) 			;
+				}
 			}
-	 	}
 		}
-	} # end of each
+	} 
 	if ($isBatchProcessing == 1) {&tcLoop();}
 }
 
@@ -869,7 +866,6 @@ sub processTC {
 		    if ($cmd) { $rst = &createTC("cmd=$cmd",$tcname); }
 		    else { $rst = &createTC($tcname); }
             } elsif ( $tcOP =~ /^\s*exec\b/i ) {
-		    # here $rst = &execTC($tcname);
 		    $rst = &execTC_($tcname);
             } elsif ( $tcOP =~ /^\s*execAll/i ) {
 		    $rst = &tcLoop();
@@ -932,8 +928,6 @@ sub createTC {
 	if ($testsuite) {;} else { print "[Info] \$testsuite is null. Note \$tcName = $tcName\n"; $testsuite ="";}
 	if ($testcase ) {;} else { print "[Info] \$testcase  is null. Note \$tcName = $tcName\n"; $testcase = "";}
 
-	# my $tcNameIIS = $tcName; $tcNameIIS =~ s/c:/c:\/inetpub\/wwwroot/; 
-	# my $tcNameIIS = $tcName; $tcNameIIS =~ s/c:/c:\/inetpub\/wwwroot/; $tcNameIIS =~ s/wwwroot\/_TAF/wwwroot\/_TAF_http/; 
 	my $tcNameIIS = $tcName; 
 	if ($tcNameIIS) {;} else { print "[Info] \$tcName is null, \$tcNameIIS = 'c:/inetpub/wwwroot/'\n"; $tcNameIIS = 'c:/inetpub/wwwroot/';}
 	&createFile( $tcNameIIS.'\\'.'tc.hta', 
@@ -970,14 +964,12 @@ sub createTC {
 
 // <a onclick=\"RunFileHTTP(\'$testsuite\', \'$testcase\')\">Click this to run Run Program</button> <p>
 	</script>
-
 </head>
 <body onLoad =\"RunFileHTTP(\'$testsuite\', \'$testcase\')\">Run $testsuite\/$testcase\/tc.hta</button> <p>
 </body>
 </html>
 "
  			);
-
 
 		######################## tc.hta ##########################
 		if ($cmd =~ /Perf/i) {  # PerformanceTC
@@ -1049,32 +1041,23 @@ EOF
 	}
 }
 
-
 sub execTC {
-	my $tcName = &getTCName(@_)		;
-	my $timeStart = &getDate(); my $rst=''	; 
+	my $tcName = &getTCName(@_); my $timeStart = &getDate(); my $rst=''			; 
 	if  ( -e "$tcName/tc.pl" ) { 
-		my $cmd     = "$tcName/tc.pl"; $rst     = `$cmd`; 
-		my $timeEnd= &getDate(); 
+		my $cmd     = "$tcName/tc.pl"; $rst     = `$cmd`; my $timeEnd= &getDate()	; 
 	       $rst =~ /(pass|fail|todo|[\d|.]+)$/i; $rst = $1; 
 	       if ($rst) {;} else {$rst = "null";}
 	       $rst =~ s/^\s*0+//g;
-	       my $rstStr = sprintf "%20s|%10s|%s", "tcRunResult",$rst , $timeStart;
-	       $rstStr .= "|"; $rstStr .= "$timeEnd"; $rstStr .= "|"; $rstStr .= "0:0:0:0s";
-	       $rstStr .= "|"; 
-	       if ( $rst =~ /^\s*[\d+|\.]+\s*$/ ) {
-		$rstStr .= "Performance Test ($rst) ";
-	       } else {
-	       $rstStr .= "Functional Test ($rst) ";
-	       } 
+	       my $rstStr = sprintf "%20s|%10s|%s", "tcRunResult",$rst , $timeStart		;
+	       $rstStr .= "|"; $rstStr .= "$timeEnd"; $rstStr .= "|"; $rstStr .= "0:0:0:0s"; $rstStr .= "|"; 
+	       if ( $rst =~ /^\s*[\d+|\.]+\s*$/ ) { $rstStr .= "Performance Test ($rst) "; } 
+	       else { $rstStr .= "Functional Test ($rst) "; } 
 	       $rstStr .= '|comment2'; 
 	       &addProperty(&getTCName($tcName), "add=$rstStr");
 	       return $rst;
+       } else {
+	       return "tcName: $tcName doesn't exist.\n";
        }
-       else {
-		return "tcName: $tcName doesn't exist.\n";
-       }
-
 }
 
 
@@ -1142,21 +1125,6 @@ sub getTCNameStr{
 	@_ = split /\\|\//, $SvrTCNameStr; 
 	pop;
 }
-sub tcAvgResponseTime { # absolete
-		my $tcname = shift; if ($tcname) {;} else {print "tcAvgResponseTime lack TCname\n";}
- 		my $rst= &reportTC1(&getTCName($tcname),"","history")."\n";				
-		@_ = split /\n/, $rst;
-		my $ctr =0; my $totalTime =0; # in sec
-		for (my $i=0; $i<=$#_; $i++) {
-			$_[$i] =~ /^\s*(\w+)\s+(\w+)\s+/;
-			my $tmp1 = $2;
-			$tmp1 =~ s/s\s*$//g;
-			$totalTime = $totalTime + $tmp1; $ctr++; 
-		}
-		if ($ctr == 0) { return '0.00'; }
-		else { return sprintf "%.2f",$totalTime/$ctr;}
-}
-
 
 ################################################################################
 #	Subroutine Name : processProperty
@@ -1406,6 +1374,7 @@ sub getGlobalVars {
 	\$tc_pl               	= $tc_pl
 	\$tsDriver            	= $tsDriver
 	\$web_ui_title        	= $web_ui_title
+	\$workingDir          	= $workingDir
 EOF
 	return $return;
 } 
@@ -1416,12 +1385,10 @@ sub setGlobalVars {
 	foreach my $each (@_) {
 		$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/;
 		my $varName = $1; my $varValue = $2;
-		if ($varName =~ /SvrDrive/i) { $SvrDrive = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /SvrProjName/i) { $SvrProjName = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /SvrTCName\b/i) { $SvrTCName = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /SvrTCNamePattern\b/i) { $SvrTCNamePattern = $varValue; 
-				$SvrTCNameExecPattern = $SvrTCNamePattern;
-		$foundMatch = 1;}
+		if ($varName =~ /SvrDrive/i) 			{ $SvrDrive = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /SvrProjName/i) 		{ $SvrProjName = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /SvrTCName\b/i) 		{ $SvrTCName = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /SvrTCNamePattern\b/i) 	{ $SvrTCNamePattern = $varValue; $SvrTCNameExecPattern = $SvrTCNamePattern; $foundMatch = 1;}
 		elsif ($varName =~ /SvrTCNameExecPattern/i) { $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /SvrPropNamePattern\b/i) { $SvrPropNamePattern= $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /SvrPropValuePattern/i)  { $SvrPropValuePattern= $varValue; $foundMatch = 1;}
@@ -1444,23 +1411,24 @@ sub setGlobalVars {
 		elsif ($varName =~ /\bPropValueFilter\b/i)  	{ $SvrPropValuePattern= $varValue; $foundMatch = 1;}
 
 		elsif ($varName =~ /\btsuit\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btname\b/i) 	{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\bpname\b/i)  	{ $SvrPropNamePattern= $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\bpvalue\b/i)  	{ $SvrPropValuePattern= $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btop\b/i) 		{ $tcOp= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btname\b/i) 		{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bpname\b/i)  		{ $SvrPropNamePattern= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bpvalue\b/i)  		{ $SvrPropValuePattern= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btop\b/i) 			{ $tcOp= $varValue; $foundMatch = 1;}
 
-		elsif ($varName =~ /\bts\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btn\b/i) 	{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btc\b/i) 	{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btne\b/i) 	{ $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\bop\b/i) 		{ $tcOp= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bts\b/i) 			{ $SvrProjName = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btn\b/i) 			{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btc\b/i) 			{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btne\b/i) 			{ $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bop\b/i) 			{ $tcOp= $varValue; $foundMatch = 1;}
 
-		elsif ($varName =~ /\bpr2Screen\b/i)  { $pr2Screen= $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\bnotUsegetTCName\b/i)  { $notUsegetTCName = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btc_pl\b/i)     { $tc_pl= $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btcDriver\b/i)  { $tc_pl= $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\btsDriver\b/i)  { $tsDriver = $varValue; $foundMatch = 1;}
-		elsif ($varName =~ /\bweb_ui_title\b/i)  { $web_ui_title= $varValue; $foundMatch = 1; $web_ui_title =~ s/___/ /g;}
+		elsif ($varName =~ /\bpr2Screen\b/i)  		{ $pr2Screen= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bnotUsegetTCName\b/i)  	{ $notUsegetTCName = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btc_pl\b/i)     		{ $tc_pl= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btcDriver\b/i)  		{ $tc_pl= $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btsDriver\b/i)  		{ $tsDriver = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bweb_ui_title\b/i)  	{ $web_ui_title= $varValue; $foundMatch = 1; $web_ui_title =~ s/___/ /g;}
+		elsif ($varName =~ /\bworkingDir\b/i)  		{ $workingDir= $varValue; $foundMatch = 1;}
 	}
 	$foundMatch;
 }
@@ -1468,23 +1436,122 @@ sub setGlobalVars {
 
 sub runPowershell {
 	my $cmd = shift; 
-	if ($cmd =~ /.ps1\s*$/) { $cmd = "$cmd";}
+	if ($cmd =~ /.ps1\s*$/) { $cmd = "$cmd"; return `$cmd`;}
+	else {
 	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
 	return `$perl $cmd`;
+	}
 }
 
-sub generateTestsuite { 						# Generating index.pl
-	my $cmd = getcwd(); my $cwd = getcwd(); 
-	########### generate index.pl ################
-	if (-e "$cmd\/index.pl")     { $cmd = $cmd . "\/index.pl";}	
-	elsif (-e "$cmd\/index.ps1") { $cmd = $cmd . "\/index.ps1";}
-	else  { 
-		if ($tsDriver =~ /null/i) { $tsDriver = "$cmd\/index.pl"; }
-		open Fout, "> $cmd/index.pl";
 
-	my $tsNameTmp =	&getRoot($cmd);
+sub generateIndex_pyAnvil_pl {
+
+	#my $cwd = getcwd(); my $cmd = getcwd(). "\/index.ps1";
+	my $cwd = $workingDir; my $cmd = $workingDir. "\/index.ps1";
+
+	open Fout, "> ".$cwd."/index_pyAnvil.pl";
+print Fout<<EOF_;
+############################ index_pyAnvil.pl ###################################
+use strict;
+&execTC(\$ARGV[0]);
+
+sub execTC {
+	my \$passFail='FAIL'; my \$logHtml; my \$logXml	;
+	my \$pyAnvil= 'c:/pyAnvil/pyAnvil -s '		;
+	my \$tcDir  = "$cwd\/"		;
+	my \$testsuiteHook = "index.pl"			; 
+	my \$tcId   = -1				; \$tcId   = shift if \@_;
+	my \$tcDesc = "Testcase \$tcId Demo"		; \$tcDesc = shift if \@_;
+	my \$tsDesc = "pyAnvil Testsuite Demo"		; \$tsDesc = shift if \@_; 
+
+	\$testsuiteHook = \$tcDir.\$testsuiteHook		; 
+	my \$tcScenario = "_tc.xml"			; \$tcScenario = \$tcDir."_tc.xml"	; 
+	my \$tcLog_pyAnvil = "_tcLogAppend_.txt"         ; \$tcLog_pyAnvil = \$tcDir."\$tcLog_pyAnvil";
+	if (\$tcId =~ /^\\s*\$/) { print `\$testsuiteHook`; return 0; }
+my \$str=<<EOF;
+<?xml version="1.0" encoding="utf-8"?>
+<XMLTestCollection>
+    <TestList TestCases="\$tcDesc">
+	<ToolCase>
+	    <Name>\$tcDesc</Name>
+	    <Executable>C:/strawberry/perl/bin/perl.exe</Executable>
+	    <Parameters>\$testsuiteHook \$tcId</Parameters>
+	    <StdoutContains>PASS</StdoutContains>
+	</ToolCase>
+    </TestList>
+</XMLTestCollection>
+EOF
+	open Fout, ">\$tcScenario"; print Fout \$str; close Fout; my \$cmd = \$pyAnvil."\$tcScenario"; my \$rst = `\$cmd`; 
+	foreach my \$each (split /\n/, \$rst) { 
+		if (   \$each =~ /^\\s+PASS\\s+/)     { \$passFail = "PASS";}
+		elsif (\$each =~ /^\\s+FAIL\\s+/)     { \$passFail = "FAIL";}
+		elsif (\$each =~ /^\\s+XML:\\s+(.+)/) { \$logXml   = \$1;}
+		elsif (\$each =~ /^\\s+HTML:\\s+(.+)/){ \$logHtml  = \$1;}
+	}
+open Fout, "> \$tcLog_pyAnvil "; print Fout "\$rst\n"; close Fout;  print "- > \$tcLog_pyAnvil\n"; 
+	print "\$passFail\n"; 
+}
+############################ index_pyAnvil.pl ###################################
+EOF_
+	close Fout; print    "  -->".$cwd."/index_pyAnvil.pl\n";
+
+}
+
+sub generateGenerateTestsuite {
+	# my $cwd = getcwd(); $cwd = shift if @_;
+	my $cwd = $workingDir; $cwd = shift if @_;
+	open Fout, "> ".$workingDir."/generateTestsuite.pl";
+print Fout<<EOF;
+\$cmd = "c:/_TAF/taf.pl web_ui_title=MV___SDK___PROXY___(Please___connect___to___Intel___Network);tsDriver=$cwd/index.pl;printVars;generateTestsuite"; `\$cmd`;
+EOF
+	close Fout;
+}
+sub generateIndex_pl {
+	my $cwd = $workingDir; $cwd = shift if @_;
+	open Fout, "> ".$cwd."/index.pl";
 print Fout<<EOF_;
 
+##################### index.pl for pyAnvil ############################
+my \$testsuiteHook = "powershell -file $cwd/index.ps1";
+
+
+if    (\$ARGV[1]) { print &call_index(\$ARGV[0], "noExec") ;	}  
+elsif (\$ARGV[0]) { print &call_index(\$ARGV[0], "yesExec");    }
+else             { print &call_index();                         }
+
+
+sub call_index { 		my \$return ; my \$recordCtr=1;
+	if (\@_) {;} else {; return `\$testsuiteHook`;}
+	my \$indexCtr = 9999	; \$indexCtr = shift if \@_; 		 
+	my \$execYN   = 'noExec' ; \$execYN   = shift if \@_; 
+	\@_ = (split /\\n/, `\$testsuiteHook`) ;
+
+
+	foreach \$each (\@_) { 
+		if ((\$each) && (\$each =~ /^\\s*_/)) { \$return = \$return .\$each."\n";
+		} elsif ((\$each) && (\$each !~ /^\\s*_/)) {
+			\$return = \$return . sprintf "TC [%04s] %s\\n",\$recordCtr,\$each; 
+			if ((\$recordCtr == \$indexCtr ) && ( \$execYN =~ /noExec/i )) { return "TC [\$recordCtr]       \$each"; } 
+			if ((\$recordCtr == \$indexCtr ) && ( \$execYN =~ /yesExec/i)) { return `\$testsuiteHook \$indexCtr `  ; } 
+			\$recordCtr++;
+	  	} 
+ 	} 
+	if (\$return =~ /pass/i) { return 0;} 
+	if (\$return =~ /fail/i) { return 1;} 
+}
+
+##################### index.pl for pyAnvil ############################
+EOF_
+	close Fout; print    "  -->".$cwd."/index.pl\n";
+
+
+}
+
+sub generatePerl_pl_template {
+	my $cmd = $workingDir; 
+	open Fout, "> $cmd/index.pl";
+	my $tsNameTmp =	&getRoot($cmd);
+print Fout<<EOF_;
 if (\$ARGV[0]) { 
 	if (\$ARGV[0] == 1) { print "pass"; } # <<< plug in the test case 1 here e.g. print `index.pl 1` ; >>>
 	if (\$ARGV[0] == 2) { print "pass"; } # <<< plug in the test case 2 here e.g. print `index.pl 2`>>>
@@ -1494,8 +1561,6 @@ if (\$ARGV[0]) {
 	if (\$ARGV[0] == 6) { print "pass"; } # <<< plug in the test case 6 here e.g. print `index.pl 6`>>>
 } else {
 print \<\<EOF;
-_testsuiteName_: $tsNameTmp
-_testdriverName_: $tsDriver
 1. Test case description 1 for testing the function 1 --- Please modifyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 2. Test case description 2 for testing the function 2 --- Please modifybbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 3. Test case description 3 for testing the function 3 --- Please modifycddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
@@ -1505,156 +1570,86 @@ _testdriverName_: $tsDriver
 EOF
 ;
 }
-
 __END__
-
-# ------------- index.pl for index.ps1 wrapper 
-my \$testsuiteHook = "powershell -file c:/test/index.ps1";
-
-
-if    (\$ARGV[1]) { print &call_index(\$ARGV[0], "noExec") ;	}  
-elsif (\$ARGV[0]) { print &call_index(\$ARGV[0], "yesExec");      }
-else             { print &call_index();                         }
-
-
-sub call_index { 		my \$return ; my \$recordCtr=1;
-
-	my \$indexCtr = 9999	; \$indexCtr = shift if \@_; 		 
-	my \$execYN   = 'noExec' ; \$execYN   = shift if \@_; 
-	\@_ = (split /\n/, `\$testsuiteHook`) ;
-
-
-	foreach \$each (\@_) { 
-		if ((\$each) && (\$each =~ /^\\s*_/)) { \$return = \$return .\$each."\\\\n";
-		} elsif ((\$each) && (\$each !~ /^\\s*_/)) {
-			\$return = \$return . sprintf "TC [%04s] %s\\\\n",\$recordCtr,\$each; 
-			if ((\$recordCtr == \$indexCtr ) && ( \$execYN =~ /noExec/i )) { return "TC [\$recordCtr]       \$each"; } 
-			if ((\$recordCtr == \$indexCtr ) && ( \$execYN =~ /yesExec/i)) { return `\$testsuiteHook \$indexCtr `  ; } 
-			\$recordCtr++;
-	  	} 
- 	} 
-
-
-	return \$return;
-}
-
-# ------------- index.pl for index.ps1 wrapper 
-
-
-
-EOF_
-		close Fout;
-		print "\n[Warning] [".getcwd()."] directory does not have test suite hook. A temporial index.pl is created. Please edit it for the test sutie.\n"; ; 
-$cmd = $cmd . "\/index.pl";
-
-print    "  -->$cmd\n"; 
-	}	
-	########### generate index.pl ################
-	########### generate index_pyAnvil.pl ################
-		open Fout, "> ".getcwd()."/index_pyAnvil.pl";
-print Fout<<EOF_;
-\&execTC(\$ARGV[0]);
-
-sub execTC {
-	my \$passFail; my \$logHtml; my \$logXml;
-	my \$index  = 1					; \$index  = shift if \@_;
-	my \$tcDesc = "Testcase \$index Demo by Yong"	; \$tcDesc = shift if \@_;
-	my \$tsDesc = "Testsuite Demo by Yong"		; \$tsDesc = shift if \@_; 
-	my \$tcDir  = "$cwd/";
-	my \$tsHook = "index.pl"			; \$tsHook = \$tcDir.\$tsHook		; 
-	my \$tcScenario = "_tc.xml"			; \$tcScenario = \$tcDir."_tc.xml"	; 
-	my \$tcLog_pyAnvil = "_tcLogAppend_.txt"        ; \$tcLog_pyAnvil = \$tcDir."\$tcLog_pyAnvil";
-
-
-\$str=<<EOF;
-<?xml version="1.0" encoding="utf-8"?>
-<XMLTestCollection>
-    <TestList TestCases="\$tcDesc">
-	<ToolCase>
-	    <Name>\$tcDesc</Name>
-	    <Executable>C:/strawberry/perl/bin/perl.exe</Executable>
-	    <Parameters>\$tsHook \$index</Parameters>
-	    <ExitCodeExpected>0</ExitCodeExpected>
-	</ToolCase>
-    </TestList>
-</XMLTestCollection>
-EOF
-
-	open Fout, ">\$tcScenario"; print Fout \$str; close Fout; \$cmd = 'c:/pyAnvil/pyAnvil -s '."\$tcScenario"; \$rst = `\$cmd`; 
-
-	foreach \$each (split /\\n/, \$rst) { 
-		if (  \$each =~ /^\\s+PASS\\s+/) { \$passFail = "PASS";}
-		elsif (\$each =~ /^\\s+FAIL\\s+/) { \$passFail = "FAIL";}
-		elsif (\$each =~ /^\\s+XML:\\s+(.+)/) { \$logXml = \$1;}
-		elsif (\$each =~ /^\\s+HTML:\\s+(.+)/) { \$logHtml = \$1;}
-	}
-
-open Fout, "> \$tcLog_pyAnvil "; print Fout "\$rst\\n"; close Fout;  print "- > \$tcLog_pyAnvil\\n"; 
-	print "\$passFail\\n"; 
-}
 
 EOF_
 	close Fout;
-		
-	########### generate index_pyAnvil.pl ################
-print    "  -->".getcwd()."/index_pyAnvil.pl\n";
+	print "\n[Warning] [".$workingDir."] directory does not have test suite hook. A temporial index.pl is created. Please edit it for the test sutie.\n"; ; 
+	$cmd = $cmd . "\/index.pl";
+	print    "  -->$cmd\n"; 
 
-$cmd = shift if @_;
-my $testsuiteName="_default_testsuite_";
-my $testsuitePropertyFName='tsProperty.txt';
-my $testDriverName = $cmd;
-my $tsPropertyStr = "web_ui_title: ";
-my $tcCtr=1;
-my $TAF= $SvrDrive ;
+#_testsuiteName_: $tsNameTmp
+#_testdriverName_: $tsDriver
 
+}
 
+sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnvil.pl 
+	# my $cmd = getcwd();  $cmd = shift if @_;
+	my $cmd = $workingDir;  $cmd = shift if @_;
+	my $cwd = $cmd;
+	if (-e "$cmd\/index.pl")     { $cmd = $cmd . "\/index.pl";}	#### pre-existing testsuiteHook is index.pl 
+	elsif (-e "$cmd\/index.ps1") { $cmd = $cmd . "\/index.ps1";	#### pre-existing testsuiteHook is index.ps1 
+		&generateIndex_pyAnvil_pl($cwd)			  ; 	# --> generate index_pyAnvil.pl 
+		&generateIndex_pl ($cwd)			  ; 	# --> generate index.pl 
+	} else  { 							####  No pre-existing index.pl 
+		if ($tsDriver =~ /null/i) { $tsDriver = "$cmd\/index.pl"; }	
+		&generatePerl_pl_template();
+	}								
+
+	##############################################  subroutine Main ###########################################
+	$cmd = shift if @_; my $testsuiteName="_default_testsuiteblas_"; my $testsuitePropertyFName='tsProperty.txt'; my $testDriverName = $cmd; 
+	my $tsPropertyStr = "web_ui_title: "; my $tcCtr=1; my $TAF= $SvrDrive ;
+
+	$testsuiteName = &getRoot($cwd);  			############ $testsuiteName = &getRoot(&getcwd());  
 
 
 	############ Generate Property file for webUI tc description
- if ($cmd =~ /\.ps1\s*$/) { $cmd = "powershell -file ". $cmd; }
+ 	if ($cmd =~ /\.ps1\s*$/) { $cmd = "powershell -file ". $cmd; }
 	foreach my $each (split "\n", &runPowershell($cmd)) {	# get testsuiteName _testsuitename_: (\w+)and _testdrivername_: (\w+)
-		if    ($each =~ /_testsuitename_/i)  { $each =~ /_testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; if ($testsuiteName =~ /\s/) { print "white space in testsuitename\n";exit; }}
-		elsif ($each =~ /_testdrivername_/i) { $each =~ /_testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
+		if    ($each =~ /_testsuitename_/i)  { $each =~ /_testsuitename_\s*:\s*(.+)\s*$/i;  $testsuiteName  = $1; if ($testsuiteName =~ /\s/) { print "white space in testsuitename\n";exit; }}
+		elsif ($each =~ /_testdrivername_/i) { $each =~ /_testdrivername_\s*:\s*(.+)\s*$/i; $testDriverName = $1; }
 		else { ; }
 	}
+
 print<<EOF;
   <--$cmd       _testsuitename_ : [$testsuiteName] 
   <--$cmd       _testdrivername_: [$testDriverName] 
-  <--$cmd       Generating c:\\_TAF\\$testsuiteName ...... (Can takes several minutes)
+  <--$cmd       Generating c:\\_TAF\\$testsuiteName ...... (Can take several minutes)
 EOF
 
-if ($web_ui_title =~ /Test Automation Framework/) {$tcCtr=1; $tsPropertyStr = $tsPropertyStr . " $testsuiteName : web_ui_title\n";}
-else {$tcCtr=1; $tsPropertyStr = $tsPropertyStr . " $web_ui_title: web_ui_title\n";}
+	if ($web_ui_title =~ /Test Automation Framework/) {$tcCtr=1; $tsPropertyStr = $tsPropertyStr . " $testsuiteName : web_ui_title\n";} # overwrite web_ui_title 
+	else {$tcCtr=1; $tsPropertyStr = $tsPropertyStr . " $web_ui_title: web_ui_title\n";}
 
-foreach my $each (split "\n", &runPowershell($cmd)) { # get testsuitePropertyString
-	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; }
-	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
-	elsif ($each =~ /^\s*\n/i) { ; }
-	elsif ($each =~ /^\s*$/i) { ; }
-	else { $tsPropertyStr = $tsPropertyStr . sprintf "$TAF\/$testsuiteName\/testcase%04d\|%4d  %s\n", $tcCtr, $tcCtr, $each; $tcCtr++;} 
-	#else { $tsPropertyStr = $tsPropertyStr . sprintf "$TAF\/$testsuiteName\/testcase%04d\|%4d  %-60s\n", $tcCtr, $tcCtr, substr $each, 0, $webUI_TCDescWidth; $tcCtr++;} 
-}
+	foreach my $each (split "\n", &runPowershell($cmd)) { # get testsuitePropertyString
+		if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; }
+		elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
+		elsif ($each =~ /^\s*\n/i) { ; }
+		elsif ($each =~ /^\s*$/i) { ; }
+		else { $tsPropertyStr = $tsPropertyStr . sprintf "$TAF\/$testsuiteName\/testcase%04d\|%4d  %s\n", $tcCtr, $tcCtr, $each; $tcCtr++;} 
+	}
 	############ Generate Property file for webUI tc description
 	############ Create Testsuite/Testcase
-$tcCtr=1;
-foreach my $each (split "\n", &runPowershell($cmd)) { # get testsuitePropertyString
-	if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; }
-	elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
-	elsif ($each =~ /^\s*\n/i) { ; }
-	elsif ($each =~ /^\s*$/i) { ; }
-	else { 
-		if ($tsDriver !~ /null/) { $testDriverName = $tsDriver; } # tsDriver overwrite testDriverName
-		my $cmd = sprintf "c:\\_TAF\\taf.pl testsuit=$testsuiteName;create=testcase%04d/overwrite,customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++  ; my $rst =`$cmd`; 
+	$tcCtr=1;
+	foreach my $each (split "\n", &runPowershell($cmd)) { # get testsuitePropertyString
+		if    ($each =~ /_testsuitename_/i)  { $each =~ /testsuitename_\s*:\s*(.+)\s*$/i;	$testsuiteName  = $1; }
+		elsif ($each =~ /_testdrivername_/i) { $each =~ /testdrivername_\s*:\s*(.+)\s*$/i; 	$testDriverName = $1; }
+		elsif ($each =~ /^\s*\n/i) { ; }
+		elsif ($each =~ /^\s*$/i) { ; }
+		else { 
+			if ($tsDriver !~ /null/) { $testDriverName = $tsDriver; } # tsDriver overwrite testDriverName
+			my $cmd = sprintf "c:\\_TAF\\taf.pl testsuit=$testsuiteName;create=testcase%04d/customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++  ; my $rst =`$cmd`; 
+			# my $cmd = sprintf "c:\\_TAF\\taf.pl testsuit=$testsuiteName;create=testcase%04d/overwrite,customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++  ; my $rst =`$cmd`; 
+		}
 	}
-}
 	############ Create Testsuite/Testcase
-
-open Fout, ">>$TAF\/$testsuiteName\/$testsuitePropertyFName" || die "Can't create file\n"; print Fout $tsPropertyStr; close Fout;
-print    "  -->$TAF\/$testsuiteName\/$testsuitePropertyFName";
-
-$cmd = sprintf "c:\\_TAF\\taf.pl testsuit=$testsuiteName\;list";  `$cmd`;
-&generateRootIndex();
-system ("C:/Program Files/Internet Explorer/iexplore.exe", "C:/_TAF/$testsuiteName/index.htm");
+	open Fout, ">>$TAF\/$testsuiteName\/$testsuitePropertyFName" || die "Can't create file\n"; print Fout $tsPropertyStr; close Fout;
+	print    "  -->$TAF\/$testsuiteName\/$testsuitePropertyFName";
+	&generateGenerateTestsuite(); 
+	print    "  -->$TAF\/$testsuiteName\/generateTestsuite\n";
+	$cmd = sprintf "c:\\_TAF\\taf.pl testsuit=$testsuiteName\;list";  `$cmd`;
+	&generateRootIndex();
+	system ("C:/Program Files/Internet Explorer/iexplore.exe", "C:/_TAF/$testsuiteName/index.htm");
+	# exec ("C:/Program Files/Internet Explorer/iexplore.exe", "C:/_TAF/$testsuiteName/index.htm");
 }
 
 sub help {
@@ -1703,7 +1698,7 @@ my $help=<<EOF;
 	taf.pl install 
 	taf.pl generateIndex
 	taf.pl generateTestsuite
-	taf.pl  tsDriver=c:/TAF_pyAnvil/index_pyAnvil.pl;web_ui_title=Test___Automation___Framework;printVars;generateTestsuite 	Generate pyAnvil Testsuite
+	taf.pl tsDriver=c:/TAF_pyAnvil/index_pyAnvil.pl;web_ui_title=Test___Automation___Framework;printVars;generateTestsuite 	Generate pyAnvil Testsuite
 	taf.pl helpmore
 -----------------------------------------------------------------------------------------------------------------------
 EOF
@@ -1773,11 +1768,8 @@ sub genDriver {
 	close Fout;
 	print " --> c:\\_TAF\\taf.pl\n";
 	}
-
 	if (-e "c:\\_TAF\\taf.bat") {;} else {
 my $str =<<EOF;
-
-
 REM create test_suit (test_suit)/test_case (tc) 
 c:\\_TAF\\taf.pl testsuit=_testsuite2_;create=_testcase1_/overwrite,sleep=1
 c:\\_TAF\\taf.pl testsuit=_testsuite2_;create=_testcase2_/overwrite,sleep=1
@@ -1887,56 +1879,56 @@ if (@_) { return $driver;} else { print $driver;}
 
 sub install 
 {
-	if (getcwd =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from a directory.'; exit}
-	if (-e "taf.pl") {;} else { open Fout, ">taf.pl"; print Fout &prDriver(1); close Fout; print " --> taf.pl\n"; }
-	if (-e "taf.bat") {;} else {
+	if ($workingDir =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from a directory.'; exit}
+	if (-e "c:\\_TAF\\taf.pl") {;} else { open Fout, ">c:\\_TAF\\taf.pl"; print Fout &prDriver(1); close Fout; print " --> c:\\_TAF\\taf.pl\n"; }
+	if (-e "c:\\_TAF\\taf.bat") {;} else {
 my $str =<<EOF;
 REM create test_suit (test_suit)/test_case (tc) 
-taf.pl testsuit=_test_suit2_;create=_testcase1_/overwrite  
-taf.pl testsuit=_test_suit2_;create=_testcase2_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase3_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase4_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase5_/overwrite
-taf.pl testsuit=_test_suit2_;create=_testcase6_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase1_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase2_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase3_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase4_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase5_/overwrite
-taf.pl testsuit=_test_suit1_;create=_testcase6_/overwrite
-taf.pl testsuit=_test_suit3_;create=_testcase1_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase1_/overwrite  
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase2_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase3_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase4_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase5_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase6_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase1_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase2_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase3_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase4_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase5_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase6_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase1_/overwrite
 
 REM performance test 
-taf.pl test_suit=_test_suit3_;create=_testcase2_/overwrite,perf
+c:\\_TAF\\taf.pl test_suit=_test_suit3_;create=_testcase2_/overwrite,perf
 REM Failed Functional test 
-taf.pl testsuit=_test_suit3_;create=_testcase3_/overwrite,fail
-taf.pl testsuit=_test_suit3_;create=_testcase4_/overwrite
-taf.pl testsuit=_test_suit3_;create=_testcase5_/overwrite,fail
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase3_/overwrite,fail
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase4_/overwrite
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase5_/overwrite,fail
 REM functional test /w log
-taf.pl testsuit=_test_suit3_;create=_testcase6_/overwrite,genLog
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase6_/overwrite,genLog
 
-taf.pl -prTestSuitProperty
+c:\\_TAF\\taf.pl -prTestSuitProperty
 
 REM exec all test_suit under test_suit (test_suit)
-taf.pl testsuit=_test_suit1_;exec
-taf.pl testsuit=_test_suit1_;testcase=*;exec
-taf.pl testsuit=_test_suit1_;testcase=testcase1*;exec
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;exec
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;testcase=*;exec
+c:\\_TAF\\taf.pl testsuit=_test_suit1_;testcase=testcase1*;exec
 
-taf.pl testsuit=_test_suit2_;exec
-taf.pl testsuit=_test_suit3_;exec
+c:\\_TAF\\taf.pl testsuit=_test_suit2_;exec
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;exec
 
 REM Seting the moving bar for showing test-in-prog status
-taf.pl testsuit=_test_suit3_;updateWeb_=_testcase1_/2,0
-taf.pl testsuit=_test_suit3_;updateWeb_=_testcase2_/1,1
-taf.pl testsuit=_test_suit3_;updateWeb_=_testcase3_/3,2
-taf.pl delete=c:/_TAF/_test_suit1_
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;updateWeb_=_testcase1_/2,0
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;updateWeb_=_testcase2_/1,1
+c:\\_TAF\\taf.pl testsuit=_test_suit3_;updateWeb_=_testcase3_/3,2
+c:\\_TAF\\taf.pl delete=c:/_TAF/_test_suit1_
 
 REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:c:/tmp/purge.pl_space_1:customTC'
 
 \@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\_TAF\\_test_suit3_\\index.htm"
 
 EOF
-	open Fout, ">taf.bat"; print Fout $str; close Fout; print " --> taf.bat\n"; my $cmd = 'taf.bat'; system $cmd;
+	open Fout, ">c:\\_TAF\\taf.bat"; print Fout $str; close Fout; print " --> c:\\_TAF\\taf.bat\n"; my $cmd = 'c:\\_TAF\\taf.bat'; system $cmd;
 	}
 }
 
@@ -2207,9 +2199,11 @@ sub appendtoFileFile_ {  	# TH:Generic Functions: append file to file (TH:Generi
 
 sub getRoot { my $string = shift; @_ = split /\\|\//, $string; return $_[$#_]; }
 sub getDir  { my $string = shift; my $root =&getRoot($string); $string =~ s/([\\|\/])?$root//i; return $string;  }
+sub getRoot_1 { my $string = shift; @_ = split /\\|\//, $string; return $_[$#_-1]; }
 
 
 sub prHtml1 {		# print index.htm beginnings
+#	&readTestSuitProperty (); 	# Read web_ui_title 
 	# my $testsuiteTotalExecTime =  &getTestsuiteTotalExecTime ("$SvrDrive/$SvrProjName/index.htm"); 
 	my $testsuiteTotalExecTime =  &getTestsuiteTotalExecTime ("$SvrDrive/$SvrProjName/$reportHtml1"); 
 &createFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, '' );
@@ -2233,7 +2227,6 @@ EOF
 	my $tmp6 = "<a title=\"Execution time = $testsuiteTotalExecTime (s) \">(sec)</a>";
 	my $tmp7 = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http.htm\" title=\"Click to run TAF-Team Version based on IIS/http\">");
 	my $tmp8 = sprintf("<a href=\"${url}/index.htm\" title=\"Click to run TAF-Team Version based on IIS/http\">");
-
 		
 my $tmp =<<EOF;
 
@@ -2494,4 +2487,83 @@ rem taf.pl testsuit=propertyChangedEvent;updateWeb=_testcase2_/1
 * using the directory recursive for searching testcases
 * CustomTC:....:CustomTC
 
-#todo: getTestsuiteTotalExecTime in the PostProcessor
+__END__
+
+############################ index_pyAnvil.pl ###################################
+use strict;
+&execTC($ARGV[0]);
+
+sub execTC {
+	my $passFail='FAIL'; my $logHtml; my $logXml	;
+	my $pyAnvil= 'c:/pyAnvil/pyAnvil -s '		;
+	my $tcDir  = "c:/test_pyAnvil/"			;
+	my $testsuiteHook = "index.pl"			; 
+	       
+	my $tcId   = -1					; $tcId   = shift if @_;
+	my $tcDesc = "Testcase $tcId Demo"		; $tcDesc = shift if @_;
+	my $tsDesc = "pyAnvil Testsuite Demo"		; $tsDesc = shift if @_; 
+
+	$testsuiteHook = $tcDir.$testsuiteHook		; 
+	my $tcScenario = "_tc.xml"			; $tcScenario = $tcDir."_tc.xml"	; 
+	my $tcLog_pyAnvil = "_tcLogAppend_.txt"         ; $tcLog_pyAnvil = $tcDir."$tcLog_pyAnvil";
+	if ($tcId =~ /^\s*$/) { print `$testsuiteHook`; return 0; }
+
+my $str=<<EOF;
+<?xml version="1.0" encoding="utf-8"?>
+<XMLTestCollection>
+    <TestList TestCases="$tcDesc">
+	<ToolCase>
+	    <Name>$tcDesc</Name>
+	    <Executable>C:/strawberry/perl/bin/perl.exe</Executable>
+	    <Parameters>$testsuiteHook $tcId</Parameters>
+	    <StdoutContains>PASS</StdoutContains>
+	</ToolCase>
+    </TestList>
+</XMLTestCollection>
+EOF
+
+	open Fout, ">$tcScenario"; print Fout $str; close Fout; my $cmd = $pyAnvil."$tcScenario"; my $rst = `$cmd`; 
+
+	foreach my $each (split /\n/, $rst) { 
+		if (  $each =~ /^\s+PASS\s+/) { $passFail = "PASS";}
+		elsif ($each =~ /^\s+FAIL\s+/) { $passFail = "FAIL";}
+		elsif ($each =~ /^\s+XML:\s+(.+)/) { $logXml = $1;}
+		elsif ($each =~ /^\s+HTML:\s+(.+)/) { $logHtml = $1;}
+	}
+
+open Fout, "> $tcLog_pyAnvil "; print Fout "$rst\n"; close Fout;  print "- > $tcLog_pyAnvil\n"; 
+	print "$passFail\n"; 
+}
+############################ index_pyAnvil.pl ###################################
+
+##################### index.pl for pyAnvil ############################
+my $testsuiteHook = "powershell -file c:/test_pyAnvil/index.ps1";
+
+
+if    ($ARGV[1]) { print &call_index($ARGV[0], "noExec") ;	}  
+elsif ($ARGV[0]) { print &call_index($ARGV[0], "yesExec");      }
+else             { print &call_index();                         }
+
+
+sub call_index { 		my $return ; my $recordCtr=1;
+	if (@_) {;} else {; return `$testsuiteHook`;}
+	my $indexCtr = 9999	; $indexCtr = shift if @_; 		 
+	my $execYN   = 'noExec' ; $execYN   = shift if @_; 
+	@_ = (split /\n/, `$testsuiteHook`) ;
+
+	foreach $each (@_) { 
+		if (($each) && ($each =~ /^\s*_/)) { $return = $return .$each."\n";
+		} elsif (($each) && ($each !~ /^\s*_/)) {
+			$return = $return . sprintf "TC [%04s] %s\n",$recordCtr,$each; 
+			if (($recordCtr == $indexCtr ) && ( $execYN =~ /noExec/i )) { return "TC [$recordCtr]       $each"; } 
+			if (($recordCtr == $indexCtr ) && ( $execYN =~ /yesExec/i)) { return `$testsuiteHook $indexCtr `  ; } 
+			$recordCtr++;
+	  	} 
+ 	} 
+	if ($return =~ /pass/i) { return 0;} 
+	if ($return =~ /fail/i) { return 1;} 
+}
+
+##################### index.pl for pyAnvil ############################
+
+
