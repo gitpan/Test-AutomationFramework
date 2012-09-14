@@ -26,7 +26,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.8';   	
+our $VERSION = '0.058.9';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 5; my $notUsegetTCName= 0;
@@ -67,7 +67,7 @@ our $VERSION = '0.058.8';
 	my $scrollAmount		= 0; 
 	my $borderWidth			= 0; 
 	my $borderStyle			= "SOLID"; 
-	my $passFailDisplayWidth	= 1; 
+	my $passFailDisplayWidth	= 10; 
 	my $maxPassFailDisplayWidth	= 20; 
 	my $reportHtmlSummaryScale 	= 3600; 				# in seconds
 	my $reportHtmlSummaryScaleMajor = 12; 					# in seconds
@@ -349,7 +349,6 @@ sub createTestsuitePassFailedHtml {
 			if ($_ =~ /tcPropertyPatternPattern/) { $_ =~ s/tcPropertyPatternPattern=\.\*/tcPropertyPatternPattern=\\\\d+_pipe_null/g; }
 			if ($_ =~ /RunFile/) { $_ =~ s/index\.htm/index_others\.htm/g; }
 				if ($_ =~ /color:green;/i) { ;
-					; # print Fout $_; 
 				} elsif ($_ =~ /color:red;/i) { ;
 				} else { print Fout $_; }
 			}
@@ -364,7 +363,6 @@ sub createTestsuitePassFailedHtml {
 			open Fin, $index; open Fout, ">$index_";
 			while ($_ = <Fin>) {
 				if ($_ =~ /color:green;/i) { 
-					; # print Fout $_; 
 				} elsif ($_ =~ /color:red;/i) { ;
 				} else { print Fout $_; }
 			}
@@ -397,7 +395,7 @@ sub updateWeb {
  		close Fout;
  		close Fin;
 
-		move ($SvrDrive.'/'.$SvrProjName.'/'.$reportHtml."_", $SvrDrive.'/'.$SvrProjName.'/'.$reportHtml);
+  		move ($SvrDrive.'/'.$SvrProjName.'/'.$reportHtml."_", $SvrDrive.'/'.$SvrProjName.'/'.$reportHtml);
 	}
 	return "tcCtr_Dynamics=$scrollamount";
 }
@@ -759,7 +757,7 @@ sub reportTCSummary {
 while ($_ =<Fin>) { 
 	chop;
 	if (($_ =~ /(testcase\d+)/) &&( $passCtr ==0 )) {
-		$tcName = $1;	# print Fout "\n$tcName: "; 
+		$tcName = $1;	
 		$reportHtmlSummaryStr = $reportHtmlSummaryStr . "\n$tcName: ";
 		$_ = <Fin>;
 		if ($_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+)\s+/) {
@@ -890,8 +888,8 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
      }		
      close Fin;
 
-	if (($passFailDisplayWidth < $tcPassFailDisplayWidth) and ($tcPassFailDisplayWidth < $maxPassFailDisplayWidth)) { $passFailDisplayWidth = $tcPassFailDisplayWidth; }
-	else { $passFailDisplayWidth = $maxPassFailDisplayWidth;}
+# todo no-intellegence now 	if (($passFailDisplayWidth < $tcPassFailDisplayWidth) and ($tcPassFailDisplayWidth < $maxPassFailDisplayWidth)) { $passFailDisplayWidth = $tcPassFailDisplayWidth; }
+# todo	else { $passFailDisplayWidth = $maxPassFailDisplayWidth;}
 
  
     ############ get maxPassFailDisplayWidth #################
@@ -913,7 +911,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 		      $beautifiedStr = sprintf "%15s %-15s %-25s%-s", $propertyValue, $totalSec.'s', $startTime, $comment1;
 		      if ($propertyValue =~ /pass/i) {$passCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."p";}
 		      if ($propertyValue =~ /fail/i) {$failCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."f";}
-		      if ($propertyValue =~ /mark/i) {$failCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."m";}
+		      if ($propertyValue =~ /mark/i) {          ; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."m";}
 		 } else {
                  	$beautifiedStr = $_;
              	 }    # endif for /tcRunResult/
@@ -961,7 +959,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 
 	} else { $TCDesc_display = sprintf "%-80s", $tcname; }
 
-
+	# prHtml2 mark for search
 
 	my $tcSerialN = $TCDesc_display; if ($tcSerialN =~ /^\s*\d+\s+/) {$tcSerialN =~ /^\s*(\d+)\s+/; $tcSerialN = "$1"; if ($tcSerialN) {;} else {$tcSerialN = "";}}
 	my $dirRoot = &getRoot($tcname); 
@@ -1009,13 +1007,16 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 sub genPassFailDisplay {
 	my $str = shift;
 	$str = reverse $str;	
-	$str = $str. "                                                        ";
+	$str = $str. "                                                        ";	 
 	$str = substr ($str, 0, $passFailDisplayWidth);
 	$str =~ s/p/<a style=\"color:green\">*<\/a>/g;
 	$str =~ s/f/<a style=\"color:red\">*<\/a>/g;
 	$str =~ s/m/|/g;
+	if ($str =~ /^\s*$/) { $str = &genStr($passFailDisplayWidth);}
 	return $str; 
 }
+
+sub genStr { my $strLen = shift; my $return=""; for (my $i = 0; $i < $strLen; $i++) { $return  .= " "; } $return; }
 
 sub processTSs{
 	shift;
@@ -1025,8 +1026,8 @@ sub processTSs{
 		if ($each !~ /=/) {
 			if ($each =~ /\bmarkblablaaaaa\b/i) { 							;
 			} else  {
-				; #print "pd: $SvrProjName,  $each\n"; 
-				# my $str =  "\&$each();"; my $rst = eval $str; next				;  
+				; 
+ 				#print "pd: $SvrProjName,  $each\n"; my $str =  "\&$each();"; my $rst = eval $str; next				;  
 			}
 		} else {
 			$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/; my $varName = $1; my $varValue = $2		;
@@ -1781,7 +1782,6 @@ sub runPowershell {
 
 sub generateIndex_pyAnvil_pl {
 
-	#my $cwd = getcwd(); my $cmd = getcwd(). "\/index.ps1";
 	my $cwd = $workingDir; my $cmd = $workingDir. "\/index.ps1";
 
 	open Fout, "> ".$cwd."/index_pyAnvil.pl";
@@ -1833,7 +1833,6 @@ EOF_
 }
 
 sub generateGenerateTestsuite {
-	# my $cwd = getcwd(); $cwd = shift if @_;
 	my $cwd = $workingDir; $cwd = shift if @_;
 	open Fout, "> ".$workingDir."/generateTestsuite.pl";
 print Fout<<EOF;
@@ -1841,6 +1840,7 @@ print Fout<<EOF;
 EOF
 	close Fout;
 }
+
 sub generateIndex_pl {
 	my $cwd = $workingDir; $cwd = shift if @_;
 	open Fout, "> ".$cwd."/index.pl";
@@ -1917,10 +1917,10 @@ EOF_
 }
 
 sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnvil.pl 
-	# my $cmd = getcwd();  $cmd = shift if @_;
 	my $cmd = $workingDir;  $cmd = shift if @_;
 	my $cwd = $cmd;
-	if (-e "$cmd\/index.pl")     { $cmd = $cmd . "\/index.pl";}	#### pre-existing testsuiteHook is index.pl 
+	if (-e "$cmd\/index.pl")     { 
+		$cmd = $cmd . "\/index.pl";}	#### pre-existing testsuiteHook is index.pl 
 	elsif (-e "$cmd\/index.ps1") { $cmd = $cmd . "\/index.ps1";	#### pre-existing testsuiteHook is index.ps1 
 		&generateIndex_pyAnvil_pl($cwd)			  ; 	# --> generate index_pyAnvil.pl 
 		&generateIndex_pl ($cwd)			  ; 	# --> generate index.pl 
@@ -1971,10 +1971,6 @@ EOF
 		else { 
 			if ($tsDriver !~ /null/) { $testDriverName = $tsDriver; } # tsDriver overwrite testDriverName
 			my $ps1_args_ = $ps1_args; $ps1_args_ =~ s/ /___/g;
-			# **recursive calling** 
-			#my $cmd = sprintf "$c\\$_TAF\\taf.pl ps1_args=$ps1_args_;testsuit=$testsuiteName;create=testcase%04d/customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++  ; 
-			#my $rst =`$cmd`; 
-
 			my $cmd = sprintf "ps1_args=$ps1_args_;testsuit=$testsuiteName;create=testcase%04d/customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++  ; 
 			&processTCs("",$cmd);
 		}
@@ -1985,9 +1981,11 @@ EOF
 	print    "  -->$c/$_TAF/$testsuiteName/$testsuitePropertyFName\n";
 	&generateGenerateTestsuite(); 
 	print    "  -->$c/$_TAF/$testsuiteName/generateTestsuite\n";
-	$cmd = sprintf "$c/$_TAF/taf.pl tcDelay=0;testsuit=$testsuiteName\;list";  `$cmd`;
+			$cmd = sprintf "tcDelay=0;testsuit=$testsuiteName;list"; 
+			&processTCs("",$cmd);
 	&generateRootIndex();
 	if ($interact =~ /\by\b/) {system ("C:/Program Files/Internet Explorer/iexplore.exe", "$c/$_TAF/$testsuiteName/index.htm");}
+	print "\n";
 }
 
 
@@ -2032,7 +2030,7 @@ my $help=<<EOF;
 
 	TAF usage examples: 
 
-	taf.pl -help 
+	taf.pl -help or helpmore
 	taf.pl testsuit=testsuitA;list			List test cases of testsuitA
 	taf.pl testsuit=testsuitA;exec			Exec test cases of testsuitA
 	taf.pl install 
@@ -2043,11 +2041,11 @@ my $help=<<EOF;
 	taf.pl tcPropertyPatternPattern=fail;tcPropertyPatternName=tcRunResult;testsuite=_testsuite3_
 	taf.pl tcPropertyPatternPattern=\\d+_pipe_null;tcPropertyPatternName=tcRunResult;testsuite=_testsuite3_
 	taf.pl -processTSs [create|delete|add]=$c/_testsuite1/_testsuite2
-	taf.pl helpmore
 	taf.pl Execution_24_7=y;NofExecution=5;Execution=24hour;testsuite=_MV_SDK_OCSP;[list|exec]
 	taf.pl testsuit=CPD_QA_Tests/BATtests/MVTests/Bat/MV_2-0-1-0057/_MV_SDK_OCSP;list
 	taf.pl exitTAF
 	taf.pl ExecutionType=[runTC|runTS]
+
 -----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
@@ -2096,8 +2094,8 @@ taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|d
 	$c\\$_TAF\\taf.pl  web_ui_title=testtitle;printVars;generateTestsuite
 	cwd/taf.pl generateTestsuite 
 	taf.pl generateRootIndex
-	taf.pl helpmore
-
+	$c\\$_TAF\\taf.pl workingDir=c:/_MahoBby_/CPD_QA_Tests/BATtests/MVTests/Bat/MV_2-0-1-0062/_MV_SDK_OCSP;web_ui_title=c:/_MahoBby_/CPD_QA_Tests/BATtests/MVTests/Bat/MV_2-0-1-0062/_MV_SDK_OCSP;ps1_args=-buildpath___c:/_MahoBay_/CPD_QA_Tests/BATTests/MVTests/Bat/;generateTestsuite
+	
 -----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
@@ -2416,7 +2414,7 @@ sub updateWeb_ {
 	if ($_[2]) { $borderstyle= $_[2];} 
 
 	if ($movingString =~ /runTC/i) { $movingString = '>'; }
-	if ($movingString =~ /runTS/i) { $movingString = '>|'; }
+	if ($movingString =~ /runTS/i) { $movingString = '>>'; }
 
 	$tcname = &getTCName($tcname); $tcname =~ s/\\/\//g;
 	############ BEGIN #############
@@ -2429,7 +2427,7 @@ sub updateWeb_ {
  			my $tcnameTmp = $tcname;
  			if ( $_ =~ /$tcnameTmp/i) {
  				$_ =~  />(\S+)<\/marquee>/;  my $movingString_ = $1; 
-				if ($movingString_) {;} else { $movingString_ = '>'; }
+				if ($movingString_) {;} else { $movingString_ = '>>'; }
  				$_ =~ s/>$movingString_<\/marquee>/>$movingString<\/marquee>/;
  				$_ =~  /scrollamount=\s*(\d+)\s*/;  my $scrollamount_ = $1; if ($scrollamount_) {;} else { $scrollamount_ = 0; }
  				$_ =~ s/scrollamount=\s*$scrollamount_\s*/scrollamount=$scrollamount/;
@@ -3006,7 +3004,8 @@ sub call_index { 		my $return ; my $recordCtr=1;
 
 
 # todo list:
-# * Bug 'mark' is counted as a failure
+# * Bug 'L' has characters other than '*'
+# * Bug 'mark' is counted as a failure 	- Done
 # * list should list all TS/TCs
 # * mark by time
 # * mark with comments (mouse over comments)
@@ -3042,7 +3041,7 @@ sub call_index { 		my $return ; my $recordCtr=1;
 # * Linux porting
 # * WS architecture
 # * win8 installation
-
+# * passFailDisplayWidth is self-adjustable (see todo) 
 # Completed Requirements/Bug fixes 
 # * line 1951: **recursive calling** -Done on 09/04/2012
 # * 24 exec,  					done
