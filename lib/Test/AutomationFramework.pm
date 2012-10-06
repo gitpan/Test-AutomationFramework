@@ -26,7 +26,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.15';   	
+our $VERSION = '0.058.18';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
@@ -1089,9 +1089,10 @@ sub genStr { my $strLen = shift; my $return=""; for (my $i = 0; $i < $strLen; $i
 
 sub processTSs{
 	shift;
-	my $tmp = shift;
-	@_ = split /;/, $tmp;
-	foreach my $each (@_) {
+ 	my $each = shift;
+#	my $tmp = shift;
+#	@_ = split /;/, $tmp;
+#	foreach my $each (@_) {
 		if ($each !~ /=/) {
 			if ($each =~ /\bmarkblablaaaaa\b/i) { 							;
 			} else  {
@@ -1109,7 +1110,7 @@ sub processTSs{
 				}
 			}
 		}
-	} 
+	#} # foreach 
 }
 
 
@@ -1250,7 +1251,7 @@ sub recursiveSearchListAll() {
 
 sub createTS {		# Create Testsuite for Testbed 
 	my $tsName = "_testsuite_"; $tsName = shift if @_;
-	if ($SvrProjName ne "_testsuite_") { $tsName = $SvrProjName; } # for backwards compatibility
+	####### here if ($SvrProjName ne "_testsuite_") { $tsName = $SvrProjName; } # for backwards compatibility
 	$workingDir = $tsName;
 	if ($workingDir =~ s/_powershell_//i)  { 
 		my $rst = mkpath $workingDir ; print " --> Create Powershell Testsuite: $workingDir\n";
@@ -2298,10 +2299,108 @@ EOF
 	&generateRootIndex();
 	if ($interact =~ /\by\b/) {system ("C:/Program Files/Internet Explorer/iexplore.exe", "$c/$_TAF/$testsuiteName/index.htm");}
 	print "\n";
+	1;
 }
 
 
+sub help4install {
+if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+	&genDriver_taf_pl ();
+
+my $help=<<EOF;
+-----------------------------------------------------------------------------------------------------------------------
+	Test::AutomationFramework - Test Automation Framework  (TAF)	version: $VERSION
+
+	TAF manages automated test cases regarding test setup, test query, test execution and 
+	test reportings with *ONE* mouse-click. No programming and no manual Reading.
+
+        ---------------------------------------------------------------------------------------------------------------
+	$c/$_TAF/index.htm	         WebAccess TAF-Testbed
+	$c/$_TAF/taf.pl -help4intro      TAF Introduction
+	$c/$_TAF/taf.pl -help4install    Command_line usages 
+	$c/$_TAF/taf.pl -help4cmd        Command_line usages 
+	$c/$_TAF/taf.pl -help4developer  Historical and under-development Functions
+        ---------------------------------------------------------------------------------------------------------------
+
+	TAF Test Case integration - $c/$_TAF/[test_suite]/[test_case]/tc.pl
+				
+			* $c/$_TAF/[test_suite]/[test_case]/tc.pl  : print Pass|fail|number to STDOUT
+			* $c/$_TAF/[test_suite]/[test_case]/tc.pl  : geneate TC Log as cwd()/_appendLog.txt 
+
+	TAF Test Suite integration - $c/$_TAF/[test_suite]/index.pl or index.ps1
+
+			* $c/$_TAF/index.[pl|ps1]             : print one TC Description per line
+			* $c/$_TAF/index.[pl|ps1] Index       : exec Index-th TC
+
+  	[Web Access: http://$c/$_TAF/index.htm]
+	1. Install StrawberryPerl 
+	2. Install TAF from CPAN                 (Perl -MCPAN -e "install Test::AutomationFramework)
+	3. Install TAF Testbed                           (Perl -MTest::AutomationFramework -e "help"   
+	4. *One* mouse click to execute and view test results in the Test Bed
+
+	[Web examples]
+	5. Add test suite by modifying $c/$_TAF/taf.bat 
+	6. Add test case by modifying $c/$_TAF/[test_suite]/[test_case]/tc.pl 
+	7. Run $c/$_TAF/taf.bat to create user's test suite structure and start its webUI
+	
+	webUI TAF usages scenarios:  	
+		List Test cases:		
+			* list test pass|fail                                     (click Pass|Fail) 
+			   cmd>taf.pl testsuite=_testsuit2_;list
+			* list Passed test cases                               (click title's Pass)
+			   cmd>taf.pl testsuite=_testsuit2_;tcFilters=tcRunResult_matches_pass 
+			* list Failed test cases                             (click title's Failed)
+			   cmd>taf.pl testsuite=_testsuit2_;tcFilters=tcRunResult_matches_fail
+			* list non-Pass|Failed test cases          (click \| between Pass and Fail) 
+			   cmd>taf.pl testsuite=_testsuit2_;tcFilters=tcRunResult_matches_null
+		Exec Test cases:		
+			* Exec test cases 		      	  	  (click pass|fail counters)
+			   cmd>taf.pl testsuite=_testsuit2_;testcase=testcase0001;exec
+			   cmd>taf.pl testsuite=_testsuit2_;testcase=testcase000[1,2,3,4];exec
+			   cmd>taf.pl testsuite=_testsuit2_;testcase=testcase000[1-9];exec
+			* Exec test suite 		            (click title pass|fail counters)
+			   cmd>taf.pl testsuite=_testsuit2_;exec
+		View Test Results
+			* View historical pass/fail 	                           (click Pass|Fail) 
+			* View historical logs		                           (click Test Desc) 
+			* View historical pass/fail in graphics 		(click title Result)
+-----------------------------------------------------------------------------------------------------------------------
+EOF
+	print $help;
+	&genDriver();
+	1;
+}
+
 sub help {
+if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+	&genDriver_taf_pl ();
+
+my $help=<<EOF;
+-----------------------------------------------------------------------------------------------------------------------
+	Test::AutomationFramework - Test Automation Framework  (TAF)	version: $VERSION
+		TAF manages automated test cases regarding test setup, test query, test execution and 
+		test reportings with *ONE* mouse-click. No programming and no manual Reading.
+-----------------------------------------------------------------------------------------------------------------------
+
+	$c/$_TAF/taf.pl helpmore                TAF Usage Samples
+	$c/$_TAF/taf.pl testsuite=_testsuit3_   Frequently Used Command line
+
+
+	$c/$_TAF/index.htm	       WebAccess TAF-Testbed
+	$c/$_TAF/taf.pl help4intro      TAF Introduction
+	$c/$_TAF/taf.pl help4install    Command_line usages 
+	$c/$_TAF/taf.pl help4cmd        Command_line usages 
+	$c/$_TAF/taf.pl help4dev        Historical and under-development Functions
+
+-----------------------------------------------------------------------------------------------------------------------
+EOF
+	print $help;
+	&genDriver();
+	1;
+}
+
+
+sub help4intro {
 if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
 	&genDriver_taf_pl ();
 
@@ -2332,7 +2431,7 @@ my $help=<<EOF;
 	5. Add test suite by modifying $c/$_TAF/taf.bat 
 	6. Add test case by modifying $c/$_TAF/[test_suite]/[test_case]/tc.pl 
 	7. Run $c/$_TAF/taf.bat to create user's test suite structure and start its webUI
-
+	
 	webUI TAF usages scenarios:  	
 		List Test cases:		
 			* list test pass|fail                                     (click Pass|Fail) 
@@ -2354,6 +2453,71 @@ my $help=<<EOF;
 			* View historical pass/fail 	                           (click Pass|Fail) 
 			* View historical logs		                           (click Test Desc) 
 			* View historical pass/fail in graphics 		(click title Result)
+-----------------------------------------------------------------------------------------------------------------------
+EOF
+	print $help;
+	&genDriver();
+}
+
+sub helpmore {
+if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+	&genDriver_taf_pl ();
+
+my $help=<<EOF;
+-----------------------------------------------------------------------------------------------------------------------
+	Test::AutomationFramework - Test Automation Framework  (TAF)	version: $VERSION
+
+	[TAF Execution Controls]
+	$c\\$_TAF\\taf.pl -help 
+	$c\\$_TAF\\taf.pl tcPropertyPatternPattern=\\d+_pipe_null;tcPropertyPatternName=tcRunResult;testsuite=_testsuite3_  rem list tcRunResult =~ /performance|null/
+	$c\\$_TAF\\taf.pl -processTSs [create|delete|add]=$c/_testsuite1/_testsuite2
+	$c\\$_TAF\\taf.pl Execution_24_7=y;NofExecution=5;Execution=24hour;testsuite=_MV_SDK_OCSP;[list|exec]
+	$c\\$_TAF\\taf.pl testsuit=CPD_QA_Tests/BATtests/MVTests/Bat/MV_2-0-1-0057/_MV_SDK_OCSP;list
+	$c\\$_TAF\\taf.pl exitTAF
+	$c\\$_TAF\\taf.pl ExecutionType=[runTC|runTS]
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;performanceMode=fast;list
+	$c\\$_TAF\\taf.pl [SUTSymbol|tsFilterDefault]=_;tsFilter="2.2.0.217[_doit_];scanTestsuites 
+	$c\\$_TAF\\taf.pl generateRootIndex
+	$c\\$_TAF\\taf.pl -processTCs create=tc1/fail,overwrite
+	$c\\$_TAF\\taf.pl -processTCS tsDriver=index_pyAnvil.pl;printVars;testsuite=_testsuite3_;list
+		
+	#####################  Powershell Testsuite Exmaples     ##################################
+	$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
+	$c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
+
+	#####################  get/set tc [Property|Filter]      ##################################
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;propertyOP=set_property1_[as|eq]_propVal1[_doit_]
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;propertyOP=_get_property1[_doit_]
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;propertyOP=_get__all_[_doit]
+
+	##################### TC [list|exec] based on TC Filters ##################################
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;listTcfilters
+		taf.pl testsuite=_testsuite2_;pm=fast;tcOp=listtcfilters
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;tcFilters=testproperty_matches_tsetProperValue1;[list|exec]		
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;tppp1=;tppn1=;tppp2=;tppn2=....
+
+	e.g. 
+		1. taf.pl testsuite=_testsuite2_;[list|print]Tcfilters
+		2. taf.pl testsuite=_testsuite2_;propertyOP=_set_property1_[as|eq]_propVal1_doit_
+		3. taf.pl testsuite=_testsuite2_;propertyOP=_get_property1
+		4. taf.pl testsuite=_testsuite2_;tcFilters=property1_matches_PropertyValue1;[list|exec]		
+-----------------------------------------------------------------------------------------------------------------------
+EOF
+	print $help;
+	&genDriver();
+	1;
+}
+
+sub help4cmd{
+if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+	&genDriver_taf_pl ();
+
+my $help=<<EOF;
+-----------------------------------------------------------------------------------------------------------------------
+	Test::AutomationFramework - Test Automation Framework  (TAF)	version: $VERSION
+
+	TAF manages automated test cases regarding test setup, test query, test execution and 
+	test reportings with *ONE* mouse-click. No programming and no manual Reading.
 
 	[Programmer's Usage: from command line. see TAF commands cmd> and taf cmds in $c/$_TAF/taf.bat>]
 
@@ -2408,7 +2572,7 @@ my $help=<<EOF;
 	$c\\$_TAF\\taf.pl -processTCS tsDriver=index_pyAnvil.pl;printVars;testsuite=_testsuite3_;list
 		
 	#####################  Powershell Testsuite Exmaples     ##################################
-	$c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
+	$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
 	$c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
 
 	#####################  get/set tc [Property|Filter]      ##################################
@@ -2431,8 +2595,11 @@ my $help=<<EOF;
 EOF
 	print $help;
 	&genDriver();
+	1;
 }
-sub helpmore {
+
+
+sub help4dev{
 my $help=<<EOF;
 -----------------------------------------------------------------------------------------------------------------------
 
@@ -2513,6 +2680,7 @@ taf.pl  -processTC or -tc arg=[tcName;cmd] create=tc1|list|get|exec=tc1|detect|d
 -----------------------------------------------------------------------------------------------------------------------
 EOF
 	print $help;
+	1;
 }
 sub genDriver_taf_pl {
 	if (-e "$c/$_TAF/taf.pl") {;} else {
@@ -2563,6 +2731,7 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase1_/overwrite,sleep=2
 
 REM Powershell test suite
 
+$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
 $c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
 REM Testbed for P.A. conversion
 $c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
@@ -2579,7 +2748,6 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase7_/overwrite,fail,genLog
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase8_/overwrite,pass,genLog,sleep=1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase9_/overwrite,expectedFail,genLog,sleep=1
 
-$c\\$_TAF\\taf.pl printTestBedProperties
 
 
 REM exec all test_suit under test_suit (test_suit)
@@ -2608,11 +2776,13 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0003/overwrite,sleep=1,cu
 $c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0004/overwrite,sleep=1,customTC:taftestcase4:customTC
 $c\\$_TAF\\taf.pl testsuit=_testsuite4_;exec
 
+$c\\$_TAF\\taf.pl printTestBedProperties
 
 REM Setting the moving bar for showing test-in-prog status
 $c\\$_TAF\\taf.pl testsuit=_testsuite1_;
 $c\\$_TAF\\taf.pl testsuit=_testsuite2_;
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;updateWeb_=_testcase1_/2
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;updateWeb_=_testcase2_/1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;updateWeb_=_testcase3_/3

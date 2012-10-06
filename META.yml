@@ -23,4 +23,4 @@ requires:
   File::Path: 2.0801
   Getopt::Long: 2.38
   Test::More: 0.96
-version: v0.058.15
+version: v0.058.18
