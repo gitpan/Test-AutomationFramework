@@ -6,12 +6,14 @@ use Test::AutomationFramework;
 my $cmd; my $rst; my $loaded = 1; my $tcName ; my $tcDesc ;  my $tcOp;
 my $taf= 'c:/_TAF/taf.pl';
 ########################## End of black magic.
-my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
 
-	&test1_pre(); 
- 	&test1_verify(); 
-      	&test1_verifyB(); 
-      	&test1_post(); 
+
+ my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
+ 	&test1_pre(); 
+    	&test1_verify(); 
+        &test1_verifyB(); 
+	&test1_post(); 
+
 
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl Test-AutomationFramework.t'
@@ -48,7 +50,7 @@ $TAF->processTCs("pr2Screen=0");
 &regression4GlobalVars(); 
 &regression4Property(); 
 &regression4TC();
-done_testing(122);
+done_testing(82);
 sub regression4GlobalVars {
 	$tcDesc = "Global Variable Managements";
 	$TAF->help();
@@ -66,6 +68,7 @@ sub regression4Property {
 # 	Regression Test of TC Property Create|List|
 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (add=prop:value) ";
 	# $TAF->setGlobalVars("pr2Screen=0;");
+	$TAF->setGlobalVars("notusegetTCName=0;");
 	$TAF->processTCs("pr2Screen=0");
 	$TAF->processTCs("printVars");
     	$TAF->processTC("delete=$tcName"); 
@@ -73,109 +76,138 @@ sub regression4Property {
 	$TAF->processTC("create=$tcName"); 
 	$TAF->processTCs("printVars");
  #	------ add Property 
- 	$TAF->processProperty($tcName,"add=addedProperty1:propVal1");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal1");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal2");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal3");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal4");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal5");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal6");
- 	$TAF->processProperty($tcName,"add=addedProperty3:propVal3");
- 	$TAF->processProperty($tcName,"add=addedProperty4:propVal4");
-  	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (add=addedPropertyN:propValueN) - like";
-	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": list all Properties");
-  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": list all Properties");
-  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal3/, $tcDesc.": list all Properties");
+ 	$TAF->processProperty($tcName,"_set_addedProperty1_as_propVal1");
+ 	$TAF->processProperty($tcName,"_set_addedProperty2_as_propVal1");
+ 	$TAF->processProperty($tcName,"_set_addedProperty2_as_propVal2");
+ 	$TAF->processProperty($tcName,"_set_addedProperty3_as_propVal3");
+ 	$TAF->processProperty($tcName,"_set_addedProperty4_as_propVal4");
+ 	$TAF->processProperty($tcName,"_set_addedProperty5_as_propVal5");
+ 	$TAF->processProperty($tcName,"_set_addedProperty6_as_propVal6");
+ 	$TAF->processProperty($tcName,"_set_addedProperty3_as_propVal3");
+ 	$TAF->processProperty($tcName,"_set_addedProperty4_as_propVal4");
+ 	$TAF->processProperty($tcName,"_set_addedProperty6_as_propVal6");
   #	------ get Property 
-  	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;latest) - like";
-  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": list all Properties");
-  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": list all Properties");
-  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal3/, $tcDesc.": list all Properties");
-  	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal2/, $tcDesc.": list all Properties");
-  	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal5/, $tcDesc.": list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;value) - like";
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal1/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal2/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal3/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal4/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal5/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal6/, $tcDesc.": list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;value) - unlike";
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty1/, $tcDesc.": list all Properties");
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty2/, $tcDesc.": list all Properties");
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty3/, $tcDesc.": list all Properties");
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty4/, $tcDesc.": list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;history) ";
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty1\s*=\s*propVal1/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal1/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal2/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal3/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal4/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty3\s*=\s*propVal3/, $tcDesc.": list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty4\s*=\s*propVal4/, $tcDesc.": list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop:value) ";
- 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty3/, "$tcDesc: list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop:value) ";
- 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty1/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty2/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty3/, "$tcDesc: list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=) ";
- 	like ($TAF->processProperty($tcName,"get="), qr/propVal1/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get="), qr/propVal4/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get="), qr/propVal3/, "$tcDesc: list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop) pr name/value";
- 	like ($TAF->processProperty($tcName,"get=added"), qr/addedProperty1/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added"), qr/addedProperty2/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added"), qr/addedProperty3/, "$tcDesc: list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop) unlike ";
- 
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty1/, "$tcDesc: list all Properties");
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty2/, "$tcDesc: list all Properties");
- 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty3/, "$tcDesc: list all Properties");
- 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop) like ";
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal1/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal4/, "$tcDesc: list all Properties");
- 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal3/, "$tcDesc: list all Properties");
- 
- #	------ del Property 
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (delete=addedProperty1)";
- 	$TAF->processProperty($tcName,"del=addedProperty1");
- 	unlike ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty1/, $tcDesc.": delete Property");
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (delete=addedProperty2)";
- 	$TAF->processProperty($tcName,"del=addedProperty2");
- 	unlike ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2/, $tcDesc.": delete Property");
- 
- 	$TAF->processProperty($tcName,"add=addedProperty1:propVal1");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal1");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal2");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal3");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal4");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal5");
- 	$TAF->processProperty($tcName,"add=addedProperty2:propVal6");
- 	$TAF->processProperty($tcName,"add=addedProperty3:propVal3");
- 	$TAF->processProperty($tcName,"add=addedProperty4:propVal4");$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (modify=prop:value) - like";
- 
- #	------ modify Property 
- 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": processProperty modify property");
- 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": processProperty modify property");
- 	$TAF->processProperty($tcName,"modify=addedProperty1:modifiedProperty1");
- 	$TAF->processProperty($tcName,"modify=addedProperty2:modifiedProperty2");
- 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/modifiedProperty1/, $tcDesc.": processProperty modify Property");
- 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/modifiedProperty2/, $tcDesc.": processProperty modify Property");
- 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (modify=prop:value) - unlike";
- 	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": processProperty modify Property");
- 	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": processProperty modify Property");
-	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (add=prop:value) ";
-	$TAF->processTC("delete=$tcName"); 
+  	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (_set_addedPropertyN_as_propValueN) - like";
+	like ($TAF->processProperty($tcName,"get_addedProperty1;latest"), qr/propVal1/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty3;latest"), qr/propVal3/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty6;latest"), qr/propVal6/, $tcDesc.": list all Properties");
+
+ 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (_get_propperty;latest) - unlike";
+  	like ($TAF->processProperty($tcName,"get_addedProperty1;latest"), qr/propVal1/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty2;latest"), qr/propVal2/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty3;latest"), qr/propVal3/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty4;latest"), qr/propVal4/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty5;latest"), qr/propVal5/, $tcDesc.": list all Properties");
+  	like ($TAF->processProperty($tcName,"get_addedProperty6;latest"), qr/propVal6/, $tcDesc.": list all Properties");
+
+############ The followings are unvalid after processProperty( _set_prop_as_val and _get_prop:latest) 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (_get_propperty;value) - unlike";
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;history) ";
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop:value) ";
+
+# 	$TAF->processProperty($tcName,"add=addedProperty1:propVal1");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal1");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal2");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal3");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal4");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal5");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal6");
+# 	$TAF->processProperty($tcName,"add=addedProperty3:propVal3");
+# 	$TAF->processProperty($tcName,"add=addedProperty4:propVal4");
+#  	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (add=addedPropertyN:propValueN) - like";
+#	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": list all Properties");
+#  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": list all Properties");
+#  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal3/, $tcDesc.": list all Properties");
+#  #	------ get Property 
+#  	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;latest) - like";
+#  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": list all Properties");
+#  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": list all Properties");
+#  	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal3/, $tcDesc.": list all Properties");
+#  	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal2/, $tcDesc.": list all Properties");
+#  	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal5/, $tcDesc.": list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;value) - like";
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal1/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal2/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal3/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal4/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal5/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal6/, $tcDesc.": list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;value) - unlike";
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty1/, $tcDesc.": list all Properties");
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty2/, $tcDesc.": list all Properties");
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty3/, $tcDesc.": list all Properties");
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty4/, $tcDesc.": list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;history) ";
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty1\s*=\s*propVal1/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal1/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal2/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal3/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2\s*=\s*propVal4/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty3\s*=\s*propVal3/, $tcDesc.": list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty4\s*=\s*propVal4/, $tcDesc.": list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop:value) ";
+# 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty3/, "$tcDesc: list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop:value) ";
+# 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty1/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty2/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=.*"), qr/addedProperty3/, "$tcDesc: list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=) ";
+# 	like ($TAF->processProperty($tcName,"get="), qr/propVal1/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get="), qr/propVal4/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get="), qr/propVal3/, "$tcDesc: list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop) pr name/value";
+# 	like ($TAF->processProperty($tcName,"get=added"), qr/addedProperty1/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added"), qr/addedProperty2/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added"), qr/addedProperty3/, "$tcDesc: list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop) unlike ";
+# 
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty1/, "$tcDesc: list all Properties");
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty2/, "$tcDesc: list all Properties");
+# 	unlike ($TAF->processProperty($tcName,"get=added;value"), qr/addedProperty3/, "$tcDesc: list all Properties");
+# 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop) like ";
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal1/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal4/, "$tcDesc: list all Properties");
+# 	like ($TAF->processProperty($tcName,"get=added;value"), qr/propVal3/, "$tcDesc: list all Properties");
+# 
+# #	------ del Property 
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (delete=addedProperty1)";
+# 	$TAF->processProperty($tcName,"del=addedProperty1");
+# 	unlike ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty1/, $tcDesc.": delete Property");
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (delete=addedProperty2)";
+# 	$TAF->processProperty($tcName,"del=addedProperty2");
+# 	unlike ($TAF->processProperty($tcName,"get=added;history"), qr/addedProperty2/, $tcDesc.": delete Property");
+# 
+# 	$TAF->processProperty($tcName,"add=addedProperty1:propVal1");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal1");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal2");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal3");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal4");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal5");
+# 	$TAF->processProperty($tcName,"add=addedProperty2:propVal6");
+# 	$TAF->processProperty($tcName,"add=addedProperty3:propVal3");
+# 	$TAF->processProperty($tcName,"add=addedProperty4:propVal4");$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (modify=prop:value) - like";
+# 
+# #	------ modify Property 
+# 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": processProperty modify property");
+# 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": processProperty modify property");
+# 	$TAF->processProperty($tcName,"modify=addedProperty1:modifiedProperty1");
+# 	$TAF->processProperty($tcName,"modify=addedProperty2:modifiedProperty2");
+# 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/modifiedProperty1/, $tcDesc.": processProperty modify Property");
+# 	like ($TAF->processProperty($tcName,"get=added;latest"), qr/modifiedProperty2/, $tcDesc.": processProperty modify Property");
+# 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (modify=prop:value) - unlike";
+# 	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal1/, $tcDesc.": processProperty modify Property");
+# 	unlike ($TAF->processProperty($tcName,"get=added;latest"), qr/propVal6/, $tcDesc.": processProperty modify Property");
+#	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (add=prop:value) ";
+#	$TAF->processTC("delete=$tcName"); 
 }
 
 sub regression4TC {
@@ -196,12 +228,12 @@ sub regression4TC {
       	$TAF->processTC("create=$tcName"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
-	like ($TAF->processProperty($tcName,"get=tcRunResult;latest"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
+	like ($TAF->processProperty($tcName,"get_tcRunResult"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
+#	like ($TAF->processProperty($tcName,"get_eq_tcRunResult;latest"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
+
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+1/,  $tcDesc.': preProcessor'); 
-
 #	todo ------ create Automated Test Case - retrun PASS history 
-
 #	------ create Automated Test Case - return FAIL
 
 	$tcName = "TC_tcA3"; $tcDesc = sprintf "%-40s","processTestCase (failed tc creation)";
@@ -210,7 +242,7 @@ sub regression4TC {
       	$TAF->processTC("create=$tcName;FailedTC"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
-	like ($TAF->processProperty($tcName,"get=tcRunResult;latest"), qr/fail/, $tcDesc.": TC return \'fail\'") ;
+	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/fail/, $tcDesc.": TC return \'fail\'") ;
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 
@@ -221,7 +253,7 @@ sub regression4TC {
       	$TAF->processTC("create=$tcName;performanceTC"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
-	like ($TAF->processProperty($tcName,"get=tcRunResult;latest"), qr/\d+[\.\d+]?/, $tcDesc.": TC return \'float for performance TC\'") ;
+	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/\d+[\.\d+]?/, $tcDesc.": TC return \'float for performance TC\'") ;
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': postProcessor'); 
 
@@ -244,18 +276,14 @@ sub regression4TC {
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
 	$TAF->processTC("create=$tcName;FailedTC"); 
-	like ($TAF->processProperty($tcName,"get=tcRunResult;latest"), qr/pass/, $tcDesc.": TC overrite fails - Expected") ;
+	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/pass/, $tcDesc.": TC overrite fails - Expected") ;
       	$TAF->processTC("create=$tcName;FailedTC,overwrite"); 
 	$TAF->processTC("exec=$tcName"); 
-	like ($TAF->processProperty($tcName,"get=tcRunResult;latest"), qr/fail/, $tcDesc.": TC overrite succeed") ;
+	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/fail/, $tcDesc.": TC overrite succeed") ;
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 
 }
-
-
-
-
 
 	sub test1_verifyB { # Create TestSuit with directory struc 
 	  $tcDesc = "list TCs by TCNamePattern  Boundary Testing";
@@ -279,7 +307,7 @@ sub regression4TC {
 	$tcDesc = "TC_Name_Filter Test by TCNamePattern";
 	# $cmd =  $taf. ' TCNamePattern=test.*;tcOp=list;pr2Screen=1;printVars -processTC execAll'; $rst = `$cmd`; 
 	#  $cmd =  $taf. ' TCNamePattern=test.*;tcOp=list;pr2Screen=1;printVars'; $rst = `$cmd`; 
-	  $cmd =  $taf. ' TCNamePattern=test.*;tcOp=list'; $rst = `$cmd`; 
+	 $cmd =  $taf. ' TCNamePattern=test.*;tcOp=list'; $rst = `$cmd`; 
 	 like ($rst, qr/\btestcase\b/, $tcDesc.": processTCs TCnamePattern");
 	 like ($rst, qr/\btestcase1\b/, $tcDesc.": processTCs TCnamePattern");
 	 like ($rst, qr/\btestcase2\b/, $tcDesc.": processTCs TCnamePattern");
@@ -290,7 +318,7 @@ sub regression4TC {
 	 like ($rst, qr/\btestcase_3\b/, $tcDesc.": processTCs TCnamePattern");
 	 like ($rst, qr/\btestcase_4\b/, $tcDesc.": processTCs TCnamePattern");
 	 # $cmd =  $taf. ' -processTCs TCNamePattern=test*1*;tcOp=list;pr2Screen=1 -processTC execAll'; $rst = `$cmd`; 
-	  $cmd =  $taf. ' TCNamePattern=test.*1.*;tcOp=list'; $rst = `$cmd`; 
+	 $cmd =  $taf. ' TCNamePattern=test.*1.*;tcOp=list'; $rst = `$cmd`; 
 	 unlike ($rst, qr/\btestcase\b/, $tcDesc.": processTCs TCnamePattern");
 	 like ($rst, qr/\btestcase1\b/, $tcDesc.": processTCs TCnamePattern");
 	 unlike ($rst, qr/\btestcase2\b/, $tcDesc.": processTCs TCnamePattern");
