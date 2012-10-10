@@ -26,7 +26,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.18';   	
+our $VERSION = '0.058.19';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
@@ -2733,8 +2733,8 @@ REM Powershell test suite
 
 $c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
 $c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
-REM Testbed for P.A. conversion
-$c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
+REM Testbed for Powershell Testsuite scan conversion
+REM $c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
 
 REM performance test 
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase2_/overwrite,perf,sleep=3
