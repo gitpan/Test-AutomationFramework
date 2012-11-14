@@ -7,7 +7,9 @@ use File::Path;
 use Test::More;
 use Getopt::Long;
 use File::Copy;
+use File::Copy::Recursive qw(fcopy rcopy dircopy fmove rmove dirmove);
 use File::Find;
+use Regexp::Assemble;
 use Cwd;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 require Exporter;
@@ -26,7 +28,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.19';   	
+our $VERSION = '0.058.22';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
@@ -41,6 +43,8 @@ our $VERSION = '0.058.19';
 ###################### TAF Generated Variables ###############################
 	my $scriptName 			= $0; $scriptName =~ s/\\/\\\\/g; 
 	my $workingDir			= getcwd(); 
+	my $TSHookName 			= "index.pl";
+	my $TSHookNameGenerated 	= "index.pl";
 
 ###################### TAF Default Variables ###############################
 	my $interact 			= "n";
@@ -52,13 +56,15 @@ our $VERSION = '0.058.19';
 	my $tcPropertyPatternPattern2 	= ".*"; 
 	my $tcPropertyPatternName3 	= "tcRunResult";
 	my $tcPropertyPatternPattern3	= ".*"; 
-
+	my $tcPropertyName 		= "all";
+	my $tcPropertyPattern= Regexp::Assemble->new; 
 	my $tcNamePattern		= "TC*"; 		
 	my $tcOp			= 'list';	
 	my $c				= "c:";
 	my $taf				= "taf.pl";
 	my $SUTSymbol			= "_";
 	my $tsFilterDefault 		= "_";
+	my $tcFilterDefault 		= ".*";
 	my $_TAF			= "_TAF";
 	my $SvrDrive 			= $c.'/'.$_TAF; 
 	my $SvrProjName 		= '_testSuit_'; 
@@ -71,6 +77,9 @@ our $VERSION = '0.058.19';
 	my $ps1_args 			= "";  
 	my $exitTAFGracefullyLock   	= $c.'/'.$_TAF.'/'."_exitTAFGracefully_.txt";
  	my $performanceMode		= "slow4webUI"; # fast4cmd
+	my $generateTestsuiteBAT	= $c.'/'.$_TAF."/taf_generateTestsuite.bat";
+	my $tsFrom			="";
+	my $tsTo   			="";
 ###################### TAF WebUI Default Settings ###############################
 
 	my $web_ui_title		="Test Automation Framework"; 
@@ -83,7 +92,7 @@ our $VERSION = '0.058.19';
 	my $reportHtmlSummaryScale 	= 3600; 				# in seconds
 	my $reportHtmlSummaryScaleMajor = 12; 					# in seconds
 	my $tsProperty    		= 'tsProperty.txt';
-
+	my $testcaseNode		= "";					# enforce no mix-level scan happens
 	my $reportHtml  		= 'index.htm';
 	my $reportHtml1 		= '_tcReport_.html';
 	my $reportHtmlHistory		= '_tcReportHistory_.html';
@@ -107,7 +116,7 @@ sub tcLoop {
 	my $returnValue; &releaseExitTAFGracefullyLock(); 
 	while (($Execution_24_7 eq 'y') || ($NofExecution > $NofExecutionCtr)) {
 		$NofExecutionCtr++;
-	if ($pr2Screen == 1) { if (($NofExecution == 1) && ($Execution_24_7 ne 'y')){; print "Processing ......\n" ; } else {print "Processing ($NofExecutionCtr\/$NofExecution) ......\n" ; } } else { print "";}
+	if ($pr2Screen == 1) { if (($NofExecution == 1) && ($Execution_24_7 ne 'y')){ print "Processing ......\n" ; } else {print "Processing ($NofExecutionCtr\/$NofExecution) ......\n" ; } } else { print "";}
 		if (($propertyOp =~ /^\s*$/) || ($propertyOp =~ /tcDescAuto/i)) {&tcPre(); &tcMain_(); &tcPost(); }
 		else { &tcMain_(); } # TC Property Process
 	if ($pr2Screen==1) {print " - Completed -\n"; } else { print "";}
@@ -128,13 +137,14 @@ sub tcMain_ { $notUsegetTCName= 1; find(\&recursiveSearchtcMain, $SvrDrive); }
 sub recursiveSearchtcMain() { 
 	my $returnValue ='';
 	if ($SvrTCNamePattern eq '*') { $SvrTCNamePattern = '.*';} 
-	if (($File::Find::name =~ /tc.pl\s*$/) && ($File::Find::name =~ /$SvrDrive\/$SvrProjName\//i) && ($File::Find::name =~ /$SvrTCNamePattern/i))  # TC Filter
+
+	if (($File::Find::name =~ /tc.pl\s*$/) && ($File::Find::name =~ /$SvrDrive\/$SvrProjName\/$testcaseNode/i) && ($File::Find::name =~ /$SvrTCNamePattern/i))  # TC Filter
 	{	
 		if (&detectExitTAFGracefullyLock() =~ /\bLocked\b/i ) { print "TAF exited gracefully\n"; exit; } 
 		$tcIdCtr++;
-		my $eachTC = &getRoot($File::Find::name);	
-		$SvrTCName = &getDir($File::Find::name);
-		$eachTC = &getRoot($eachTC);
+		my $eachTC 	= &getRoot($File::Find::name);	
+		$SvrTCName 	= &getDir ($File::Find::name);
+		$eachTC	 	= &getRoot($eachTC);
 
 		&getWeb_($eachTC) =~ /scrollAmount\s*=\s*(\d+)/; $scrollAmount = $1; if ($scrollAmount) {;} else {$scrollAmount =0;}
 		&getWeb_($eachTC) =~ /borderWidth\s*=\s*(\d+)/ ; $borderWidth  = $1; if ($borderWidth) {;} else {$borderWidth=0;}
@@ -159,10 +169,8 @@ sub recursiveSearchtcMain() {
 				my $tcDescAuto="";
 				if ($#tcDesc eq 0 ) {;} else { $tcDescAuto = "add=tcDesc:".shift @tcDesc; }
 				my $tcDescAuto_ = $tcDescAuto; $tcDescAuto =~ s/_space_/ /g; $tcDescAuto =~ s/_column_/:/g; $tcDescAuto =~ s/_eq_/=/g; 
-
 				printf "%-20s %s %s\n", "processProperty:", &getTCName($File::Find::name),$tcDescAuto;
 				&processProperty("",&getTCName($File::Find::name), $tcDescAuto_);
-
 			} elsif (($propertyOp =~ /_doit_/i) || ($propertyOp =~ /^\s*_?get_/i)) {   					# property Operation (_doit_)
 				my $propertyOp_  = $propertyOp; 
 				$propertyOp_  =~ s/_doit_//g;
@@ -209,13 +217,15 @@ sub recursiveSearchtcMain() {
 }
 sub tcPost {
 	##################### Post PRocessor ###################
- 	&appendtoFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtmlHistory,"</pre></body></html>\n")				;
-   	&mergeFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1)		;
-   	&mergeFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http)	;
+ 	&appendtoFile_		($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtmlHistory,"</pre></body></html>\n")				;
+   	&mergeFile_		($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1)		;
+   	&mergeFile_		($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http)	;
 	&prHtml1()			;
-	&appendtoFileFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1,      $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml)	;
-	&appendtoFileFile_($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http);
+	&appendtoFileFile_	($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1,      $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml)	;
+	&appendtoFileFile_	($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http, $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http);
 	&prHtml2()			;
+# 	&removeDuplicate  	($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml)	;	# have bug. will create empty index.htm
+# 	&removeDuplicate   	($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http);
 	&generateRootIndex       ()	; 
 	&updateTestsuiteHTA      ()	;
 	&updateTestsuitePassFail ()	;
@@ -223,18 +233,122 @@ sub tcPost {
 } 
 
 
-#######################generateRootIndex {
+####################### remove duplicate records in file
+sub removeDuplicate { 
+	my $fname  = shift;
+	if ($fname ) {;} else { print "remvoeDuplicate: needs filename\n"; exit; }
+	if (-e $fname ) {;} else { print "remvoeDuplicate: $fname doesn't exist\n"; exit; }
+	my $fname_tmp = $fname."_.htm"; 
+open FILE , $fname; 
+open FILE_tmp , "> $fname_tmp";
+my $firstOccurence = "_firstOccurence_";
+while ($_ = <FILE>) { if (($firstOccurence !~ /^_firstOccurence_$/) and ($_ ne $firstOccurence)) { print FILE_tmp $_; $firstOccurence = $_; } }
+close FILE;
+close FILE_tmp;
+copy ($fname_tmp, $fname);
+}
+
+####################### copy Testsuite                  
+sub copyTestsuite { shift; print "copy $tsFrom -> $tsTo\n"; rcopy ($tsFrom, $tsTo) or die $!;}
+sub copyTS        { shift; print "copy $tsFrom -> $tsTo\n"; rcopy ($tsFrom, $tsTo) or die $!;}
+#######################generate Property TCs from desc
+
+sub generateTestsuiteByDesc {
+$tsFilterDefault =~ s/\\/\//g;
+&tcMain_1(); 
+1;
+}
+sub tcMain_1 { 
+	print "	Scanning for testsuites at $tsFilterDefault ......\n"; 	
+	find(\&recursiveSearchtcMain_1, $tsFilterDefault); print "	[fyi: -> $generateTestsuiteBAT]\n"; 
+1;
+}
+sub recursiveSearchtcMain_1() { 
+	if (($File::Find::name =~ /\/$TSHookName\s*$/) && ($tcPropertyName !~ /all/i))
+	{ 	
+		&readTCDesc($File::Find::name);
+	 	$tcPropertyPattern->add($tcPropertyName ); 
+		&generateTS ($File::Find::name, $tcPropertyName); 
+	}
+}
+sub generateTS {
+	my $str; 
+	my $tsHook 		= "index.pl"	; $tsHook 		= shift if @_			;  
+	my $tcPropertyNameLocal = "_smoketest_"	; $tcPropertyNameLocal 	= shift if @_			;
+	my $tsDir 		= $tsHook	; $tsDir		=~ s/(\/$TSHookName\s*$)//g	;  
+	my $tsHookChild 	= "$tsDir/${tcPropertyName}/$TSHookNameGenerated";
+	my $tsDirChild 		= "$tsDir/$tcPropertyNameLocal";
+
+	my $otherCmd = "copy (\"$tsDir/_tcLogAppend.txt\", \"$tsDirChild/_tcLogAppend.txt\")";
+	$ps1_args =~ s/\\/\//g;
+	if ($tsHook =~ /\.ps1\s*$/)	{ $tsHook	= "powershell -executionpolicy unrestricted -file $tsHook $ps1_args "; }
+
+my $perlCode=<<EOF_;
+use File::Copy;
+if (\$ARGV[0]) { 
+	#_cmd_holder_#
+} else {
+print \<\<EOF;
+#_desc_holder_#
+EOF
+;
+}
+EOF_
+;
+	my $ctr_local=1;
+	for (my $i = 1; $i <= $#tcDesc; $i++) { 
+		if ( $tcDesc[$i] =~ /($tcPropertyPattern)/i ) {		
+		$tcDesc[$i] =~ s/_(\S+)*_//g;
+		my $tmpStr = "if (\$ARGV[0] == $ctr_local) { \$rst = \`$tsHook $ctr_local\` ; $otherCmd; print \$rst; } \n";	 
+		$perlCode =~ s/#_cmd_holder_#/$tmpStr\t#_cmd_holder_#/;
+		$tmpStr = "$ctr_local. $tcDesc[$i]\n";
+		$tmpStr =~ s/\\/\//g;  
+		$perlCode =~ s/#_desc_holder_#/$tmpStr#_desc_holder_#/;		$ctr_local++;
+		}
+	}
+	if ($ctr_local > 1) {
+	if (-e $tsDirChild) {;} else { mkpath $tsDirChild;}
+	open Fout , ">$tsHookChild"; print Fout $perlCode; close Fout; print  "	->$tsHookChild\n";
+	}
+}
+
+sub readTCDesc {
+	my $cmd = shift; my $ctr = 1;
+	$#tcDesc = -1;		
+	if ($cmd =~ /\.ps1\s*$/) { $cmd = "powershell -executionpolicy unrestricted -file $cmd $ps1_args"; }
+ 	foreach my $each (split /\n/, `$cmd`) {
+ 		if ($each =~ /^\s*$/) {; }
+ 		elsif ($each =~ /^\s*_test/) { ; } 
+ 		else {
+			# $tcDesc[$ctr++] = $each;
+ 			$tcDesc[$ctr++] = $each."_full_";
+ 		}
+ 	}
+
+}
+
+
+#######################generate Property TCs from desc
 sub scanTestsuites {					######### generate index.htm
-	shift; my $doit="n"; 
+	shift; my $doit="n";  my @dir;
 	if ($tsFilter =~/_doit_/i) { $doit='y'; $tsFilter =~ s/_doit_//i;} 
-	#my @dir = glob "${c}\\${SUTSymbol}*"; 
-	my @dir = glob "${c}\\${$tsFilterDefault}*"; 
+	if ($tsFilterDefault =~/_doit_/i) { $doit='y'; $tsFilterDefault =~ s/_doit_//i;} 
+	
+	if ($tsFilterDefault =~ /^$c/)	 {
+	@dir = glob "${tsFilterDefault}*"; 
+	} else {
+	@dir = glob "${c}\\${tsFilterDefault}*"; 
+	}
+
 foreach my $each (@dir) {
 	$each =~ s/\\/\//g;
-find(sub { if (($File::Find::name =~ /index\.\w+$/i) && ($File::Find::name !~ /${c}\/${_TAF}/i)) {
-			my $dirName =  $File::Find::name; $dirName =~ s/[\\|\/]index..+$//g;
-			if ($dirName =~ /$tsFilter/i) {
-			my $cmd = sprintf "$SvrDrive/$taf workingDir=$dirName;web_ui_title=$dirName;generateTestsuite" ;  
+find(sub { if (($File::Find::name =~ /index\.\w+$/i) && ($File::Find::name !~ /${c}\/${_TAF}/i)&&($File::Find::name !~ /${c}\\${_TAF}/i)) 
+		{
+			my $dirName =  $File::Find::name; $dirName =~ s/[\\|\/]index..+$//g; $tsFilterDefault =~ s/\\/\//g;
+			# if ($dirName =~ /$tsFilter/i) {
+			if ($dirName =~ /$tsFilterDefault/i) {
+			$ps1_args =~ s/ /___/g; 
+			my $cmd = sprintf "$SvrDrive/$taf workingDir=$dirName;web_ui_title=$dirName;ps1_args=$ps1_args;generateTestsuite" ;  
 			print "$cmd\n"; if ($doit =~ /\by\b/) { print "Running ...\n"; $cmd =~ s/\//\\/g; my $rst = `$cmd`; print $rst."\n";}
 			}
 		}
@@ -245,9 +359,10 @@ find(sub { if (($File::Find::name =~ /index\.\w+$/i) && ($File::Find::name !~ /$
 
 #######################generateRootIndex {
 sub generateRootIndex {					######### generate index.htm
+	my %tafUI;
 		&readTAFProperty(); # read %tafProperty;
 	#### part 1 ####
-open INDEX, ">$SvrDrive/index.htm"; 
+open INDEX, ">$SvrDrive/index.htm_"; 
 print INDEX<<EOF;
 <html><pre>
 <h2>Automated Test Suites on $ip</h2>
@@ -258,10 +373,16 @@ find(sub { if ($File::Find::name =~ /index\.htm$/i) {
 			my $tmp2 = $File::Find::name; 
 			$tmp=~ s/$SvrDrive//;
 			$tmp2 =~ s/\/index.htm//g;
-			if ($tafProperty{$tmp2} ) { $tmp2 = $tafProperty{$tmp2}; } 
-			print INDEX "<li><a href=\"$url".$tmp."\">$tmp2</a>\n" if ($tmp ne "/index.htm");
+			if ($tafProperty{$tmp2} ) { $tmp2 = sprintf("%-120s", $tafProperty{$tmp2}); }  # todo hardcoded 120
+			else {
+			$tmp2 = sprintf("%-120s", $tmp2);
+			}
+			$tafUI{$tmp2}="<li><a href=\"$url".$tmp."\">$tmp2</a><a style=\"color:silver\">$SvrDrive$tmp</a>\n" if ($tmp ne "/index.htm");
+			# print INDEX "<li><a href=\"$url".$tmp."\">$tmp2</a><a style=\"color:silver\">$SvrDrive$tmp</a>\n" if ($tmp ne "/index.htm");
 		}
 	 }, $SvrDrive);
+
+ 	foreach my $each1 (sort keys %tafUI) { print INDEX $tafUI{$each1}; }
 
 print INDEX <<EOF;
 </ul>
@@ -270,9 +391,10 @@ print INDEX <<EOF;
 EOF
 ;
 close INDEX;
+  		move ($SvrDrive.'/index.htm_', $SvrDrive.'/'."index.htm");
 	#### part 1 ####
 	#### part 2 ####
-open INDEX, ">$SvrDrive/index_http.htm";		########## generate index_http.htm 
+open INDEX, ">$SvrDrive/index_http.htm_";		########## generate index_http.htm 
 print INDEX<<EOF;
 <html><pre>
 <h2>Automated Test Suites on 10.24.2.66</h2>
@@ -295,6 +417,7 @@ print INDEX <<EOF;
 EOF
 ;
 close INDEX;
+  		move ($SvrDrive.'/index_http.htm_', $SvrDrive.'/'."index_http.htm");
 	#### part 2 ####
 }
 
@@ -473,21 +596,31 @@ sub updateWeb {
 ################################################################################
 #        
 ################################################################################
+sub hungryMatch {    # hungryMatch("startStr_returnStr_endStr","startStr","endStr")
+    my $str        = shift; my $startStr    = shift; my $endStr    = shift;
+
+    if (index($str, $startStr) < 0) { return "";}
+    if (index($str, $endStr  ) < 0) { return "";}
+    my $offset     = index($str,$startStr) + length $startStr;
+    my $len     = index($str,$endStr)  - $offset;
+    if ($len < 0) { $len = 0; }
+    return substr ($str, $offset, $len);
+}
 sub updateTestsuiteHTA {
 	open Fin, $SvrDrive."/index.htm" || die "Can't open index.htm";
-	while ($_ = <Fin>) { chop; if ( /\/\/\/(.+)index.htm/ ) { my $ts= $1; &createTestsuiteHTA ($ts); } }
+	while ($_ = <Fin>) { chop; if ( &hungryMatch($_,"\/\/\/","index.htm") ) { my $ts= &hungryMatch($_,"\/\/\/","index.htm") ; &createTestsuiteHTA ($ts); } }
 }
 
 sub tsPostProcessPlugin {
 	open Fin, $SvrDrive."/index.htm" || die "Can't open index.htm";
-	while ($_ = <Fin>) { chop; if ( /\/\/\/(.+)index.htm/ ) { my $ts= $1; print "postProcessPlugin: $ts\n"; } }
+	while ($_ = <Fin>) { chop; if ( &hungryMatch($_,"/\/\/\/","index.htm")) { my $ts= &hungryMatch($_,"\/\/\/","index.htm"); print "postProcessPlugin: $ts\n";} }
 }
 sub updateTestsuitePassFail {
 	if (-e $SvrDrive."/index.htm" ) {
 	open FinIndex, $SvrDrive."/index.htm" || die "Can't open index.htm";
 	while ($_ = <FinIndex>) { chop; 
-		if ( /\/\/\/(.+index.htm)/ ) { 
-			my $ts     = $1 ; &createTestsuitePassFailedHtml ($ts); 
+		if ( &hungryMatch($_, "\/\/\/","index.htm" )) { 
+			my $ts     = &hungryMatch($_,"\/\/\/","index.htm")."index.htm" ; &createTestsuitePassFailedHtml ($ts); 
 			my $ts_http = $ts; $ts_http =~ s/index\.htm/index_http\.htm/; &createTestsuitePassFailedHtml ($ts_http); 
 		} 
 	}
@@ -725,12 +858,9 @@ sub addUrl {
 		} else {
 			$return = $return.$each."\n";
 		}
-
 	}
 	return $return;
 }
-
-
 
 ################################################################################
 #	Subroutine Name : getTCLogFname
@@ -1090,9 +1220,6 @@ sub genStr { my $strLen = shift; my $return=""; for (my $i = 0; $i < $strLen; $i
 sub processTSs{
 	shift;
  	my $each = shift;
-#	my $tmp = shift;
-#	@_ = split /;/, $tmp;
-#	foreach my $each (@_) {
 		if ($each !~ /=/) {
 			if ($each =~ /\bmarkblablaaaaa\b/i) { 							;
 			} else  {
@@ -1110,7 +1237,6 @@ sub processTSs{
 				}
 			}
 		}
-	#} # foreach 
 }
 
 
@@ -1128,8 +1254,8 @@ sub processTCs{
 			} elsif ($each =~ /\bexec\b/i) { 							;
 				&setGlobalVars("","tcOP=exec")							;
 				$isBatchProcessing = 1								;
-			} elsif ($each =~ /\blistTcFilters|printTcFilters\b/i) { 							;
-				&setGlobalVars("","tcOP=listtcfilters")							;
+			} elsif ($each =~ /\blistTcFilters|printTcFilters\b/i) { 				;
+				&setGlobalVars("","tcOP=listtcfilters")						;
 				$isBatchProcessing = 1								;
 			} elsif ($each =~ /\blist\b/i) { 							;
 				&setGlobalVars("","tcOP=list")							;
@@ -1280,7 +1406,6 @@ sub createTC {
 	my $cmd=''; $cmd = shift; if ($cmd !~ /^\s*cmd\s*=/i) { unshift @_, $cmd; } ;
 	my $tcNameRoot = "@_"; my $sleep = 0;
 	if ($cmd =~ /sleep\s*=\s*(\d+)/ ) { $sleep = $1; }
-	# my $tcName = &getTCName(@_);
 	my $tcName = &getTCName("@_");
 	if( &detectTC($tcName) =~ /exists/ && ($cmd !~ /Over/i)) { # overwrite
 		return "Warning $tcName already exist! (-create;cmd=overwrite)" ; } 
@@ -1297,7 +1422,6 @@ sub createTC {
 
 	my $tcNameIIS = $tcName; 
 	if ($tcNameIIS) {;} else { print "[Info] \$tcName is null, \$tcNameIIS = $c.':/inetpub/wwwroot/'\n"; $tcNameIIS = $c.':/inetpub/wwwroot/';}
-	# &createFile( $tcNameIIS.'\\'.'tc.hta', 
 	&createFile( $tcNameIIS.'/'.'tc.hta', 
 "
 <html>
@@ -1523,7 +1647,6 @@ sub markTC_ {
        else {
 		return "tcName: $tcName doesn't exist.\n";
        }
-
 }
 
 
@@ -1551,7 +1674,6 @@ sub execTC_ {
        else {
 		return "tcName: $tcName doesn't exist.\n";
        }
-
 }
 
 
@@ -1606,8 +1728,7 @@ sub processProperty {
 	if ($propertyOP =~ /^\s*_?get_(.+)/) { $propertyOP = "get_$1"; }
 	#### PropertyOp String Translation
 
-	if (defined $propertyOP) {;} else { $rst = "Warning: wrong format. Correct format is -add=prop:value"; 
-		return $rst; }
+	if (defined $propertyOP) {;} else { $rst = "Warning: wrong format. Correct format is -add=prop:value"; return $rst; }
 	if ($propertyOP =~ /;\s*pr2Screen\s*/) { $prMsg = 1; $propertyOP =~ s/;\s*pr2Screen\s*(=\s*\d*\s*)?//; }
 	if ( $propertyOP =~ /^\s*add/i ) {
                 $rst = &addProperty( &getTCName($tcname), $propertyOP );
@@ -1695,6 +1816,7 @@ sub getProperties() { 	# get TC Property Names	(TH:TC Managements)
     open Fin, "$tcname\\thProperty.txt" || die "Can't open file:$!";
     while ( $_ = <Fin> ) {
 	    @_= split /\|/, $_;
+
 	    my $propertyName_ = $_[0]; my $propertyValue_ = $_[1]; $propertyName_ =~ s/^\s*//g; $propertyName_ =~ s/\s*$//g;
 	    if (($propertyName_ !~ /^\s*$/) && ( $propertyValue_ !~ /^\s*$/)) {   
  	      	if (($propertyName_ =~ /$propertyOp/i) || ( $propertyOp eq '')) { # PropertyPattern Filter
@@ -1824,7 +1946,6 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
     my $timeStr = &getDate(); $timeStr = "|$timeStr|$timeStr|0:0:0:0s|comment1|comment2";
     my $fname        = "$_[0]/thProperty.txt";
     my $propertyName = $_[1];
-
     $propertyName =~ s/^\s*add\s*=//g;
     $propertyName =~ s/^\s*add\s*_eq_\s*//g;
     open Fout, ">>$fname";
@@ -1838,7 +1959,8 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
 		$propValue =~ s/_column_/:/g;
         	printf Fout "%20s|%10s|%s\n",$propName, $propValue,$propComment;
 	} else {
-		$propertyName =~ /^\s*(\S+)_column_(\S+)\s*/; 
+		# $propertyName =~ /^\s*(\S+)_column_(\S+)\s*/; 
+		$propertyName =~ /^\s*(\S+):(\S+)\s*/; 
 		my $propName = $1;
 		my $propValue = $2;
 		if ($propName && $propValue) {
@@ -1847,6 +1969,7 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
 		$propValue =~ s/_eq_/=/g;
 		$propValue =~ s/___/ /g;
 		$propName =~ s/^\s*add\s*=//g;
+		$propName =~ s/_space_/ /g;
         	printf Fout "%20s|%10s%s\n",$propName, $propValue,$timeStr;
 		}
 	}
@@ -1881,6 +2004,7 @@ sub getGlobalVars {
 	\$ExecutionLength 	= $ExecutionLength
 	\$ExecutionType   	= $ExecutionType   
 	\$performanceMode 	= $performanceMode
+	\$testcaseNode    	= $testcaseNode
 	
 EOF
 	return $return;
@@ -1916,7 +2040,7 @@ sub setGlobalVars {
 		elsif ($varName =~ /\bTestCase\b/i) 		{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bPropNameFilter\b/i)  	{ $SvrPropNamePattern= $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bPropValueFilter\b/i)  	{ $SvrPropValuePattern= $varValue; $foundMatch = 1;}
-
+		elsif ($varName =~ /\btcPropertyName\b/i)  	{ $tcPropertyName = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\btsuit\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\btname\b/i) 		{ $SvrTCNamePattern = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bpname\b/i)  		{ $SvrPropNamePattern= $varValue; $foundMatch = 1;}
@@ -1983,6 +2107,11 @@ sub setGlobalVars {
 		elsif ($varName =~ /\bSUTSymbol\b/i)  		{ $SUTSymbol       = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\btsFilterDefault\b/i)  	{ $tsFilterDefault = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bnotUsegetTCName\b/i)  	{ $notUsegetTCName = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bTSHookName\b/i)  		{ $TSHookName      = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\bTSHookNameGenerated\b/i)  { $TSHookNameGenerated  = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btestcaseNode\b/i)  	{ $testcaseNode    = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btsFrom\b/i)  		{ $tsFrom          = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btsTo\b/i)  		{ $tsTo            = $varValue; $foundMatch = 1;}
 
 	}
 	$foundMatch;
@@ -2104,6 +2233,7 @@ EOF_
 
 sub generatePerl_pl_template {
 	my $cmd = $workingDir; 
+	if (-e $cmd) {;} else { mkdir $cmd; }
 	open Fout, "> $cmd/index.pl";
 	my $tsNameTmp =	&getRoot($cmd);
 print Fout<<EOF_;
@@ -2117,10 +2247,10 @@ if (\$ARGV[0]) {
 } else {
 print \<\<EOF;
 1. Test case description 1 for testing the function 1 --- Please modifyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-2. Test case description 2 for testing the function 2 --- Please modifybbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-3. Test case description 3 for testing the function 3 --- Please modifycddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
-4. Test case description 4 for testing the function 4 --- Please modify
-5. Test case description 5 for testing the function 5 --- Please modify
+2. Test case description 2 for testing _smoketest__regressiontest_the function 2 --- Please modifybbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+3. Test case description 3 for testing _smoketest_the function 3 --- Please modifycddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+4. Test case description 4 for testing _regressiontest_the function 4 --- Please modify
+5. Test case description 5 for testing _regressiontest_the function 5 --- Please modify
 6. Test case description 6 for testing the function 6 --- Please modify
 EOF
 ;
@@ -2129,7 +2259,6 @@ EOF
 EOF_
 	close Fout;
 	print "\n[Warning] Creating Temporial testsuite hook --> [".$workingDir."/index.pl]\n"; ; 
-
 #_testsuiteName_: $tsNameTmp
 #_testdriverName_: $tsDriver
 
@@ -2139,6 +2268,7 @@ sub generatePowershell_ps1_template {
 	my $cmd = $workingDir; 
 	open Fout, "> $cmd/index.ps1";
 	my $tsNameTmp =	&getRoot($cmd);
+	my $tmpWorkingDir = $workingDir; $tmpWorkingDir =~ s/\\/\//g;
 print Fout<<EOF_;
 
 ###########################
@@ -2154,22 +2284,22 @@ if(\$verbose -eq \$true) { cls }
 \$testDictionary = \@()
 
 \$testDictionary += \@( `
-		\@{	"desc" = "Testcase1 description "; 
+		\@{	"desc" = "Testcase1 description $tmpWorkingDir "; 
 			"result" = "PASS";
 		} `
 )
 \$testDictionary += \@( `
-		\@{	"desc" = "Testcase2 description "; 
+		\@{	"desc" = "Testcase2 description $tmpWorkingDir _smoketest_ _regressiontest_"; 
 			"result" = "FAIL"; 
 		} `
 )
 \$testDictionary += \@( `
-		\@{	"desc" = "Testcase3 Description"; 
+		\@{	"desc" = "Testcase3 Description $tmpWorkingDir _smoketest_"; 
 			"result" = "FAIL"; `
 		} `
 )
 \$testDictionary += \@( `
-		\@{	"desc" = "Testcase4 Description"; `
+		\@{	"desc" = "Testcase4 Description $tmpWorkingDir _smoketest_"; `
 			"result" = "PASS"; `
 		} `
 )
@@ -2283,7 +2413,7 @@ EOF
 		elsif ($each =~ /^\s*$/i) { ; }
 		else { 
 			if ($tsDriver !~ /null/) { $testDriverName = $tsDriver; } # tsDriver overwrite testDriverName
-			my $ps1_args_ = $ps1_args; $ps1_args_ =~ s/ /___/g;
+			my $ps1_args_ = $ps1_args; $ps1_args_ =~ s/ /___/g; $ps1_args_ =~ s/\\/\//g; # ps1_args 
 			my $cmd = sprintf "ps1_args=$ps1_args_;testsuit=$testsuiteName;create=testcase%04d/customTC:${testDriverName}_space_${tcCtr}:customTC\n", $tcCtr++  ; 
 			&processTCs("",$cmd);
 		}
@@ -2293,10 +2423,12 @@ EOF
 	open Fout, ">>$c/$_TAF/$testsuiteName/$testsuitePropertyFName" || die "Can't create file\n"; print Fout $tsPropertyStr; close Fout;
 	print    "  -->$c/$_TAF/$testsuiteName/$testsuitePropertyFName\n";
 	&generateGenerateTestsuite(); 
-	print    "  -->$c/$_TAF/$testsuiteName/generateTestsuite\n";
-			$cmd = sprintf "tcDelay=0;testsuite=$testsuiteName;list"; 
+	print    "  -->$c/$_TAF/$testsuiteName/generateTestsuite.pl\n";
+	$testsuiteName = $testsuiteName;
+	# $cmd = sprintf "tcDelay=0;testsuite=$testsuiteName;list"; 
+			$cmd = sprintf "tcDelay=0;testcaseNode=$testcaseNode;testsuite=$testsuiteName;list"; 
 			&processTCs("",$cmd);
-	&generateRootIndex();
+			&generateRootIndex();
 	if ($interact =~ /\by\b/) {system ("C:/Program Files/Internet Explorer/iexplore.exe", "$c/$_TAF/$testsuiteName/index.htm");}
 	print "\n";
 	1;
@@ -2496,6 +2628,7 @@ my $help=<<EOF;
 	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;tcFilters=testproperty_matches_tsetProperValue1;[list|exec]		
 	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;pm=fast;tppp1=;tppn1=;tppp2=;tppn2=....
 
+	$c\\$_TAF\\taf.pl tcPropertyName=smoke;tsFilterDefault=c:\\_CRB_\\AppBuildpath;generateTestsuiteByDesc
 	e.g. 
 		1. taf.pl testsuite=_testsuite2_;[list|print]Tcfilters
 		2. taf.pl testsuite=_testsuite2_;propertyOP=_set_property1_[as|eq]_propVal1_doit_
@@ -2509,7 +2642,7 @@ EOF
 }
 
 sub help4cmd{
-if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY currently.\n"; exit; }
+if ( $^O =~ /MSWin32/ ) {; } else { print "TAF supports Win32 ONLY now.\n"; exit; }
 	&genDriver_taf_pl ();
 
 my $help=<<EOF;
@@ -2528,6 +2661,8 @@ my $help=<<EOF;
 			* c:\\_TAF\\taf.pl testsuit=_testsuite2_;create=_testcase1_/overwrite,sleep=20
 			* c:\\_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase6_/overwrite,genLog,sleep=10
 			* c:\\_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase9_/overwrite,expectedFail,genLog,sleep=1
+		Copy Testsuite 
+			taf.pl tsFrom=e.txt;tsTo=ee.txt;copyTS
 			
 		TC Execution controls
 		
@@ -2549,28 +2684,31 @@ my $help=<<EOF;
 -----------------------------------------------------------------------------------------------------------------------
 
 	[Examples]
+	$c\\$_TAF\\taf.pl -help 
 	$c\\$_TAF\\taf.pl genDriver
 	$c\\$_TAF\\taf.pl generateIndex_pl | generateIndex_pyAnvil_pl
 	$c\\$_TAF\\taf.pl generateTestsuite
+	$c\\$_TAF\\taf.pl generateRootIndex
+
+	#####################  TS/TC Management (Create/List/Exec) ##################################
+		
+	$c\\$_TAF\\taf.pl -processTCs create=tc1/fail,overwrite
+	$c\\$_TAF\\taf.pl -processTSs [create|delete|add]=$c/_testsuite1/_testsuite2
+	$c\\$_TAF\\taf.pl [SUTSymbol|tsFilterDefault]=_;tsFilter="2.2.0.217[_doit_];scanTestsuites 
 	$c\\$_TAF\\taf.pl tsDriver=$c/TAF_pyAnvil/index_pyAnvil.pl;web_ui_title=Test___Automation___Framework;printVars;generateTestsuite 	Generate pyAnvil Testsuite
 
 	$c\\$_TAF\\taf.pl tcIdMin=5;printVars;testsuite=_testsuite3_;list 
+	$c\\$_TAF\\taf.pl testsuit=CPD_QA_Tests/BATtests/MVTests/Bat/MV_2-0-1-0057/_MV_SDK_OCSP;list
+	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;performanceMode=fast;list
+	$c\\$_TAF\\taf.pl -processTCS tsDriver=index_pyAnvil.pl;printVars;testsuite=_testsuite3_;list
+	$c\\$_TAF\\taf.pl tcPropertyPatternPattern=\\d+_pipe_null;tcPropertyPatternName=tcRunResult;testsuite=_testsuite3_  rem list tcRunResult =~ /performance|null/
 	$c\\$_TAF\\taf.pl tcPropertyPatternPattern=fail;tcPropertyPatternName=tcRunResult;testsuite=_testsuite3_
 
-	[TAF Execution Controls]
-	$c\\$_TAF\\taf.pl -help 
-	$c\\$_TAF\\taf.pl tcPropertyPatternPattern=\\d+_pipe_null;tcPropertyPatternName=tcRunResult;testsuite=_testsuite3_  rem list tcRunResult =~ /performance|null/
-	$c\\$_TAF\\taf.pl -processTSs [create|delete|add]=$c/_testsuite1/_testsuite2
-	$c\\$_TAF\\taf.pl Execution_24_7=y;NofExecution=5;Execution=24hour;testsuite=_MV_SDK_OCSP;[list|exec]
-	$c\\$_TAF\\taf.pl testsuit=CPD_QA_Tests/BATtests/MVTests/Bat/MV_2-0-1-0057/_MV_SDK_OCSP;list
-	$c\\$_TAF\\taf.pl exitTAF
+	$c\\$_TAF\\taf.pl tcIdMin=5;printVars;testsuite=_testsuite3_;exec
 	$c\\$_TAF\\taf.pl ExecutionType=[runTC|runTS]
-	$c\\$_TAF\\taf.pl testsuite=_testsuite2_;performanceMode=fast;list
-	$c\\$_TAF\\taf.pl [SUTSymbol|tsFilterDefault]=_;tsFilter="2.2.0.217[_doit_];scanTestsuites 
-	$c\\$_TAF\\taf.pl generateRootIndex
-	$c\\$_TAF\\taf.pl -processTCs create=tc1/fail,overwrite
-	$c\\$_TAF\\taf.pl -processTCS tsDriver=index_pyAnvil.pl;printVars;testsuite=_testsuite3_;list
-		
+	$c\\$_TAF\\taf.pl exitTAF
+	$c\\$_TAF\\taf.pl Execution_24_7=y;NofExecution=5;Execution=24hour;testsuite=_MV_SDK_OCSP;[list|exec]
+
 	#####################  Powershell Testsuite Exmaples     ##################################
 	$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
 	$c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
@@ -2732,9 +2870,19 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase1_/overwrite,sleep=2
 REM Powershell test suite
 
 $c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
-$c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
+$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl
+REM $c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
 REM Testbed for Powershell Testsuite scan conversion
 REM $c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y
+
+REM generate desc-property test suite (e.g. _smoketest_, _regression_, etc)
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;tsFilterDefault=c:\\_CRB_\\AppBuildpath;generateTestsuiteByDesc
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;tsFilterDefault=c:\\_CRB_\\AppBuildpath;generateTestsuiteByDesc
+$c\\$_TAF\\taf.pl tsFilter=_CRB__doit_;scanTestsuites 
+
+$c\\$_TAF\\taf.pl workingDir=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl;generateTestsuite 
+$c\\$_TAF\\taf.pl workingDir=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_smoketest_;generateTestsuite 
+$c\\$_TAF\\taf.pl workingDir=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_regressiontest_;generateTestsuite 
 
 REM performance test 
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase2_/overwrite,perf,sleep=3
@@ -2747,8 +2895,6 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase6_/overwrite,genLog,slee
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase7_/overwrite,fail,genLog,sleep=1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase8_/overwrite,pass,genLog,sleep=1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;create=_testcase9_/overwrite,expectedFail,genLog,sleep=1
-
-
 
 REM exec all test_suit under test_suit (test_suit)
 
@@ -2789,10 +2935,53 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite3_;updateWeb_=_testcase3_/3
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;getWeb_=_testcase1_
 $c\\$_TAF\\taf.pl delete=$c/$_TAF/_test_suit1_
 
+
+REM testbed for powershell testsuite with TestHook Property cases
+$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1__powershell_
+$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2__powershell_
+$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3__powershell_
+$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4__powershell_
+
+
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuiteByDesc
+
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2_;generateTestsuiteByDesc
+
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3_;generateTestsuiteByDesc
+
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4_;generateTestsuiteByDesc
+$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4_;generateTestsuiteByDesc
+
+
+$c\\_TAF\\taf.pl tsFilterDefault=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1__doit_;scanTestsuites
+$c\\_TAF\\taf.pl tsFilterDefault=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2__doit_;scanTestsuites
+$c\\_TAF\\taf.pl tsFilterDefault=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3__doit_;scanTestsuites
+$c\\_TAF\\taf.pl tsFilterDefault=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4__doit_;scanTestsuites
+
+REM  testcaseNode=testcase will enforce only one level of scan is achieved (no different levels of scan combined)
+
+
 REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:$c/tmp/purge.pl_space_1:customTC'
 REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,pyAnvil,customTC:$c/tmp/indexPyAnvil.pl_space_1:customTC'
 \@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\$_TAF\\_testsuite3_\\index.htm"
 rem todo: property operation and property filter
+
+rem c:\\_TAF>c:\\_TAF\\taf.pl tsFilterDefault=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation_doit_;ps1_args=;ps1_args=-buildpath___c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;scanTestsuite
+s > e.txt
+
+c:\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;ps1_args=-buildpath___c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;generateTestsuiteByDesc
+
+
+c:\\_TAF\\taf.pl tsFilterDefault=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation_doit_;ps1_args=-buildpath___c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;scanTestsuites
+
+rem	copy testsuites			taf.pl tsFrom=e.txt;tsTo=ee.txt;copyTS   
 
 EOF
 	open Fout, "> $c/$_TAF/taf.bat"; print Fout $str; close Fout; print " --> $c/$_TAF/taf.bat\n"; my $cmd = "$c/$_TAF/taf.bat"; system $cmd;
@@ -2801,66 +2990,7 @@ EOF
 }
 
 # install is replaced by genDriver () . it is kept for backwards compatible
-sub install 		
-{
-	if ($workingDir =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from a directory.'; exit}
-	if (-e "$c\\$_TAF\\taf.pl") {;} else { open Fout, ">$c\\$_TAF\\taf.pl"; print Fout &prDriver(1); close Fout; print " --> $c\\$_TAF\\taf.pl\n"; }
-	if (-e "$c\\$_TAF\\taf.bat") {;} else {
-my $str =<<EOF;
-REM create test_suit (test_suit)/test_case (tc) 
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase1_/overwrite  
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase2_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase3_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase4_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase5_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;create=_testcase6_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase1_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase2_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase3_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase4_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase5_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;create=_testcase6_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase1_/overwrite
-
-REM performance test 
-$c\\$_TAF\\taf.pl test_suit=_test_suit3_;create=_testcase2_/overwrite,perf
-REM Failed Functional test 
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase3_/overwrite,fail
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase4_/overwrite
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase5_/overwrite,fail
-REM functional test /w log
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase6_/overwrite,genLog
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase7_/overwrite,fail,genLog
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;create=_testcase8_/overwrite,fail,genLog
-
-$c\\$_TAF\\taf.pl printTestBedProperties
-
-REM exec all test_suit under test_suit (test_suit)
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;exec
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;testcase=*;exec
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;testcase=testcase1*;exec
-
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;exec
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;exec
-
-REM Seting the moving bar for showing test-in-prog status
-$c\\$_TAF\\taf.pl testsuit=_test_suit1_;list
-$c\\$_TAF\\taf.pl testsuit=_test_suit2_;list
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;list
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;updateWeb_=_testcase1_/2,0
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;updateWeb_=_testcase2_/1,1
-$c\\$_TAF\\taf.pl testsuit=_test_suit3_;updateWeb_=_testcase3_/3,2
-$c\\$_TAF\\taf.pl delete=$c/$_TAF/_test_suit1_
-
-REM taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:$c/tmp/purge.pl_space_1:customTC'
-rem todo: property operation and property filter
-\@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\$_TAF\\_test_suit3_\\index.htm"
-
-EOF
-	open Fout, ">$c\\$_TAF\\taf.bat"; print Fout $str; close Fout; print " --> $c\\$_TAF\\taf.bat\n"; my $cmd = $c.'\\'.$_TAF.'\\taf.bat'; system $cmd;
-	}
-1;
-}
+sub install 		{ &genDriver(); 1; }
 
 
 sub printTestBedProperties {
@@ -2893,24 +3023,34 @@ EOF
 print Fout $str;
 close Fout; 
 
-
 	############ Generate taf Property file for webUI tc description
 open Fout, ">$c/$_TAF/tsProperty.txt";
 print Fout<<EOF;
 web_ui_title: Test Automation Framework : web_ui_title
-$c/$_TAF/_testsuite1_| 1  TAF Testbed 1  : Test Case Access: TC list, TC execution, TC Reporting
-$c/$_TAF/_testsuite2_| 2  TAF Testbed 2  : TAF can have many Testsuites 
-$c/$_TAF/_testsuite3_| 3  TAF Testbed 3  : Concurrency, Performance TCs, Logging, list/exec failed TCs
-$c/$_TAF/_testsuite4_| 4  TAF Testbed 4  : Test case/suite property operations
-$c/$_TAF/_testsuite5_| 5  TAF/pyAnvil/MV Integration
-$c/$_TAF/_testsuite6_| 6  TAF MV TC Integration 
+$c/$_TAF/_testsuite1_|001  TAF Testbed 1 : Test Case Access: TC list, TC execution, TC Reporting /o TC Description
+$c/$_TAF/_testsuite2_|002  TAF Testbed 2 : Test Case Access: TC list, TC execution, TC Reporting /o TC Description - Multiple Test suites
+$c/$_TAF/_testsuite3_|003  TAF Testbed 3 : Test Case Access: Concurrency, Performance TCs, TC Logging, list/exec pass|failed|other test cases /w TC Description 
+$c/$_TAF/_testsuite4_|004  TAF Testbed 4 : Test case/suite property operations : add|get properties
+$c/$_TAF/_testsuite5_|005  TAF/pyAnvil/MV Integration
+$c/$_TAF/_testsuite6_|006  TAF MV TC Integration 
+$c/$_TAF/_TAF/_testsuiteTestBed/_testsuite1_/_TS1|005  TAF Testbed 5 : Multiple test suite coexistence
+$c/$_TAF/_TAF/_testsuiteTestBed/_testsuite2_/_TS1|006  TAF Testbed 6 : Multiple test suite coexistence
+$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl|007  TAF Testbed 7 : TC management based on TC-desc tags (_smoketest_, _regressiontest_)
+$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_regressiontest_|008  TAF Testbed 8 : TC management based on TC-desc tags (_regressiontest_)
+$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_smoketest_|009  TAF Testbed 9 : TC management based on TC-desc tags (_smoketest_)
+$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_|010  TAF Testbed 10: Language Independency: Handling Powershell test case 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_|011  TAF Testbed 11: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_/_full_|012  TAF Testbed 12: Test suite generation : all tests                        of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_/_regressiontest_|013  TAF Testbed 13: Test suite generation : regression tests                 of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_/_smoketest_|014  TAF Testbed 14: Test suite generation : smoke tests                      of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_|015  TAF Testbed 15: Test suite Tree structure: Test suite Node (in develop)  of testsuite2
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_/_full_|016  TAF Testbed 16: Test suite generation : all tests of testsuite2          of testsuite2
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_/_regressiontest_|017  TAF Testbed 17: Test suite generation : regression tests                 of testsuite2 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_/_smoketest_|018  TAF Testbed 18: Test suite generation : smoke tests of testsuite2        of testsuite2
 EOF
 close Fout;
-
 1;
 }
-
-
 
 sub prDriver {
 	my $driver=<<EOF;
@@ -2932,7 +3072,6 @@ if (\$processProperty) 	{ \$TAF->processProperty(\$processProperty);}
 if (\$processTC) 	{ \$TAF->processTC(\$processTC);}
 if (\$scanTestsuites) 	{ \$TAF->scanTestsuites();}
 foreach \$each (\@ARGV) {\$cmdLine =\$cmdLine.\$each.';'; } \$TAF->processTCs(\$cmdLine) if \$cmdLine;
-
 EOF
 if (@_) { return $driver;} else { print $driver;}
 }
@@ -3640,9 +3779,11 @@ sub call_index { 		my $return ; my $recordCtr=1;
 # * convert \\ to / for unix port 
 # * multiple tppp filters 
 # * create ps1 testsuite createTS and its test cases
+# * TAF_Team 
+# * global $index 
 
 ############# todo: TAF_Team function ###############
-# * Web Service architecture / CGI / RPC
+# * Web Service architecture / CGI / RPC / RubyOnRaid
 # local run version and /o IIS , support multiple TC Concurrency Control, 
 # Working with new Concurrency Control scheme, TCExecSummary, tcDelay=10
 # * Linux porting
@@ -3673,6 +3814,7 @@ sub call_index { 		my $return ; my $recordCtr=1;
 # * Notif for the expected failure
 # * handle unexpected reboot scenario
 # * win8 installation
+# * add File::Copy::Recursive dependency in the build process
 ###############################################
 
 ############# todo: MarkTC related Actions #########
@@ -3704,6 +3846,11 @@ sub call_index { 		my $return ; my $recordCtr=1;
 # * testcase=testcase[1,2,3..] work for list. not work for exec -done (it works)
 # * Bug: pass/fail html is incorrect			-done
 # * modify the getProperties to pass regression		-done
+# * add removeDuplicated records to handle webUI dup	-done (wrong fix. reversed)
+# * scanTestsuite for generated property files _full_, _smoketest_, _regressiontest_
+# * scanTestsuite for generated property files _full_,  _tcLogAppend.txt was not copied to the _property_ directory - Done
+# * c:\_TAF\index.htm concurrency control 		-done
+# * Bug fix for generate index_[pass|fail].htm		-done
 ###################################################################################
 ############# done : property operations ###############
 # * Add 				-done

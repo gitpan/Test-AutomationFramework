@@ -7,8 +7,7 @@ my $cmd; my $rst; my $loaded = 1; my $tcName ; my $tcDesc ;  my $tcOp;
 my $taf= 'c:/_TAF/taf.pl';
 ########################## End of black magic.
 
-
- my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
+my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_;
  	&test1_pre(); 
     	&test1_verify(); 
         &test1_verifyB(); 
@@ -54,13 +53,13 @@ done_testing(82);
 sub regression4GlobalVars {
 	$tcDesc = "Global Variable Managements";
 	$TAF->help();
- 	like ($TAF->getGlobalVars(), qr/_testSuit_/, $tcDesc.": get Global Variables");
+ 	like ($TAF->getGlobalVars(), qr/_testsuit_/, $tcDesc.": get Global Variables");
  	like ($TAF->getGlobalVars(), qr/c:/, $tcDesc.": get Global Variables");
 	$TAF->setGlobalVars("SvrDrive=d:;SvrProjName=_testProj2_");
 	like ($TAF->getGlobalVars(), qr/_testProj2_/, $tcDesc.": set lobal Variables");
 	like ($TAF->getGlobalVars(), qr/d:/, $tcDesc.": set Global Variables");
-	$TAF->setGlobalVars("SvrDrive=c:/_TAF;SvrProjName=_testSuit_");
- 	like ($TAF->getGlobalVars(), qr/_testSuit_/, $tcDesc.": get Global Variables - postProcess");
+	$TAF->setGlobalVars("SvrDrive=c:/_TAF;SvrProjName=_testsuit_");
+ 	like ($TAF->getGlobalVars(), qr/_testsuit_/, $tcDesc.": get Global Variables - postProcess");
  	like ($TAF->getGlobalVars(), qr/c:/, $tcDesc.": get Global Variables - postProcess");
 }
 
@@ -75,6 +74,7 @@ sub regression4Property {
 	$TAF->processTCs("printVars");
 	$TAF->processTC("create=$tcName"); 
 	$TAF->processTCs("printVars");
+
  #	------ add Property 
  	$TAF->processProperty($tcName,"_set_addedProperty1_as_propVal1");
  	$TAF->processProperty($tcName,"_set_addedProperty2_as_propVal1");
@@ -100,7 +100,7 @@ sub regression4Property {
   	like ($TAF->processProperty($tcName,"get_addedProperty5;latest"), qr/propVal5/, $tcDesc.": list all Properties");
   	like ($TAF->processProperty($tcName,"get_addedProperty6;latest"), qr/propVal6/, $tcDesc.": list all Properties");
 
-############ The followings are unvalid after processProperty( _set_prop_as_val and _get_prop:latest) 
+############ The followings are invalid after processProperty( _set_prop_as_val and _get_prop:latest) 
 # 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (_get_propperty;value) - unlike";
 # 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop;history) ";
 # 	$tcName = "TC_tcA1"; $tcDesc = sprintf "%-40s","processProperty (get=prop:value) ";
@@ -358,7 +358,6 @@ sub test1_pre { # create - Test Bed
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;create=testcase_2; '; $rst = `$cmd`; print $rst;
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;create=testcase_3; '; $rst = `$cmd`; print $rst;
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;create=testcase_4; '; $rst = `$cmd`; print $rst;
-
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;tcnamepattern=testcase\b;tcop=exec; '; $rst = `$cmd`; print $rst;
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;tcnamepattern=testcase1\b;tcop=exec; '; $rst = `$cmd`; print $rst;
 	$cmd =  $taf. ' ts=_testsuit_;pr2Screen=0;tcnamepattern=testcase2\b;tcop=exec; '; $rst = `$cmd`; print $rst;

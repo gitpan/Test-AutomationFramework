@@ -34,6 +34,7 @@
          "requires" : {
             "Date::Manip" : "6.23",
             "File::Copy" : "2.18",
+            "File::Copy::Recursive" : "0.38",
             "File::Path" : "2.0801",
             "Getopt::Long" : "2.38",
             "Test::More" : "0.96"
@@ -41,5 +42,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "v0.058.19"
+   "version" : "v0.058.22"
 }
