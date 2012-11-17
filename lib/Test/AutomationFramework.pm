@@ -28,7 +28,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.22';   	
+our $VERSION = '0.058.24';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
@@ -249,8 +249,11 @@ copy ($fname_tmp, $fname);
 }
 
 ####################### copy Testsuite                  
-sub copyTestsuite { shift; print "copy $tsFrom -> $tsTo\n"; rcopy ($tsFrom, $tsTo) or die $!;}
-sub copyTS        { shift; print "copy $tsFrom -> $tsTo\n"; rcopy ($tsFrom, $tsTo) or die $!;}
+sub copyTestsuite { shift; print "copy $tsFrom -> $tsTo\n"; rcopy ($tsFrom, $tsTo) or die $!; 1;}
+sub copyTS        { shift; print "copy $tsFrom -> $tsTo\n"; 
+	if (-e $tsFrom) {;} else { print "Warning: $tsFrom doesn't exist\n"; exit; }	
+	if (-e $tsTo  ) {;} else { print "Warning: $tsTo   doesn't exist\n"; exit; }	
+	rcopy ($tsFrom, $tsTo) or die $!; return 1;}
 #######################generate Property TCs from desc
 
 sub generateTestsuiteByDesc {
@@ -281,7 +284,8 @@ sub generateTS {
 
 	my $otherCmd = "copy (\"$tsDir/_tcLogAppend.txt\", \"$tsDirChild/_tcLogAppend.txt\")";
 	$ps1_args =~ s/\\/\//g;
-	if ($tsHook =~ /\.ps1\s*$/)	{ $tsHook	= "powershell -executionpolicy unrestricted -file $tsHook $ps1_args "; }
+	# if ($tsHook =~ /\.ps1\s*$/)	{ $tsHook	= "powershell -executionpolicy unrestricted -file $tsHook $ps1_args "; }
+	if ($tsHook =~ /\.ps1\s*$/)	{ $tsHook	= "powershell -executionpolicy unrestricted -file $tsHook "; }
 
 my $perlCode=<<EOF_;
 use File::Copy;
@@ -299,7 +303,7 @@ EOF_
 	for (my $i = 1; $i <= $#tcDesc; $i++) { 
 		if ( $tcDesc[$i] =~ /($tcPropertyPattern)/i ) {		
 		$tcDesc[$i] =~ s/_(\S+)*_//g;
-		my $tmpStr = "if (\$ARGV[0] == $ctr_local) { \$rst = \`$tsHook $ctr_local\` ; $otherCmd; print \$rst; } \n";	 
+		my $tmpStr = "if (\$ARGV[0] == $ctr_local) { \$rst = \`$tsHook $ctr_local $ps1_args\` ; $otherCmd; print \$rst; } \n";	 
 		$perlCode =~ s/#_cmd_holder_#/$tmpStr\t#_cmd_holder_#/;
 		$tmpStr = "$ctr_local. $tcDesc[$i]\n";
 		$tmpStr =~ s/\\/\//g;  
@@ -2005,6 +2009,8 @@ sub getGlobalVars {
 	\$ExecutionType   	= $ExecutionType   
 	\$performanceMode 	= $performanceMode
 	\$testcaseNode    	= $testcaseNode
+	\$tsTo            	= $tsTo         
+	\$tsFrom          	= $tsFrom
 	
 EOF
 	return $return;
@@ -2193,10 +2199,14 @@ EOF
 sub generateIndex_pl {
 	my $cwd = $workingDir; $cwd = shift if @_;
 	open Fout, "> ".$cwd."/index.pl";
+	my $ps1_args_ = $ps1_args;
+	$ps1_args_ =~ s/\\/\//g;
+
 print Fout<<EOF_;
 
 ##################### index.pl for pyAnvil ############################
-my \$testsuiteHook = "powershell -executionpolicy unrestricted -file $cwd/index.ps1 $ps1_args";
+
+my \$testsuiteHook = "powershell -executionpolicy unrestricted -file $cwd/index.ps1 $ps1_args_";
 
 
 if    (\$ARGV[1]) { print &call_index(\$ARGV[0], "noExec") ;	}  
@@ -2425,7 +2435,6 @@ EOF
 	&generateGenerateTestsuite(); 
 	print    "  -->$c/$_TAF/$testsuiteName/generateTestsuite.pl\n";
 	$testsuiteName = $testsuiteName;
-	# $cmd = sprintf "tcDelay=0;testsuite=$testsuiteName;list"; 
 			$cmd = sprintf "tcDelay=0;testcaseNode=$testcaseNode;testsuite=$testsuiteName;list"; 
 			&processTCs("",$cmd);
 			&generateRootIndex();
