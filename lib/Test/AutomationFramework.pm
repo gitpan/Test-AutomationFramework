@@ -29,7 +29,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.26';   	
+our $VERSION = '0.058.28';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my %tafPropertyRev; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0;
@@ -41,6 +41,8 @@ our $VERSION = '0.058.26';
 	my $ExecutionType 	= '>'; 
 	my @tcDesc;		 my $tsFilter=".*";
 	my $exitTAFTCId		;
+	my $tcComment1		="Comment1";
+	my $tcComment2		="Comment2";
 
 ###################### TAF Generated Variables ###############################
 	my $scriptName 			= $0; $scriptName =~ s/\\/\\\\/g; 
@@ -88,13 +90,14 @@ our $VERSION = '0.058.26';
 
 	my $AutomationtsName		="Automation_MVSDK";
  	my $makeMark			= 'n'; my $makeMarkComment		= '';
+ 	my $makeMarkLastDay		= &getExecDay();
 	my $web_ui_title		="Test Automation Framework"; 
 	my $webUI_TCDescWidth 		= 80; 
 	my $scrollAmount		= 0; 
 	my $borderWidth			= 0; 
 	my $borderStyle			= "SOLID"; 
-	my $passFailDisplayWidth	= 10; 
-	my $maxPassFailDisplayWidth	= 20; 
+	my $passFailDisplayWidth	= 8; 
+	my $maxPassFailDisplayWidth	= 40; 
 	my $reportHtmlSummaryScale 	= 3600; 				# in seconds
 	my $reportHtmlSummaryScaleMajor = 12; 					# in seconds
 	my $tsProperty    		= 'tsProperty.txt';
@@ -118,13 +121,35 @@ sub new { my $package = shift;
 	return bless({}, $package);
 }
 
-sub tcLoop {
+sub markDaily {
+
+	if (($makeMarkLastDay  < &getExecDay()) && ($makeMark =~ /n/)) {
+		$makeMarkLastDay = &getExecDay(); $makeMark = 'y'; 
+	} else {
+			$makeMark = 'n';
+	}
+}
+
+sub getExecDay {
+	my $initStartTime = &UnixDate( "Jan 1, 2012", "%m/%d/%Y %H:%M:%S %Z" );
+	my $endStartTime  = &UnixDate( "now" , "%m/%d/%Y %H:%M:%S %Z" );
+	my $totalTimeSpan = &DateCalc(&ParseDate($initStartTime),&ParseDate($endStartTime));  #### => YY:MM:WK:DD:HH:MM:SS  the years, months, etc. between the two
+	my ($Y,$M,$W,$D,$H,$MIN,$S) = split /:/, $totalTimeSpan;
+	my $makeMarkLastDay_Local =  int ($H/24); 
+	return $makeMarkLastDay_Local;
+
+}
+sub tcLoop {			###### Testsuite Loop #####
 	my $returnValue;
-	#	&releaseExitTAFGracefullyLock(); 
 	while (($Execution_24_7 eq 'y') || ($NofExecution > $NofExecutionCtr)) {
+		&markDaily();
 		$NofExecutionCtr++;
 	if ($pr2Screen == 1) { if (($NofExecution == 1) && ($Execution_24_7 ne 'y')){ print "Processing ......\n" ; } else {print "Processing ($NofExecutionCtr\/$NofExecution) ......\n" ; } } else { print "";}
-		if (($propertyOp =~ /^\s*$/) || ($propertyOp =~ /tcDescAuto/i)) {&tcPre(); &tcMain_(); &tcPost(); }
+		if (($propertyOp =~ /^\s*$/) || ($propertyOp =~ /tcDescAuto/i)) {&tcPre(); 
+			&tcMain_(); 
+			&tcPost(); 
+		
+		}
 		else { &tcMain_(); } # TC Property Process
 	if ($pr2Screen==1) {
 		if ($propertyOp) { print " -> $SvrDrive/$SvrProjName/_${propertyOp}.txt\n"; }	
@@ -150,7 +175,6 @@ sub recursiveSearchtcMain() {
 
 	if (($File::Find::name =~ /tc.pl\s*$/) && ($File::Find::name =~ /$SvrDrive\/$SvrProjName\/$testcaseNode/i) && ($File::Find::name =~ /$SvrTCNamePattern/i))  # TC Filter
 	{	
-		# if (&detectExitTAFGracefullyLock() =~ /\bLocked\b/i ) { print "TAF exited gracefully\n"; &tcPost(); exit; } 
 		$tcIdCtr++;
 		my $eachTC 	= &getRoot($File::Find::name);	
 		$SvrTCName 	= &getDir ($File::Find::name);
@@ -184,7 +208,6 @@ sub recursiveSearchtcMain() {
 				my $rst = &processProperty("",&getTCName($File::Find::name), $propertyOp_);
 
 				my $File_Find_name = $File::Find::name; $File_Find_name =~ s/\/$tc_pl//g;
-				#&appendtoFile_	($SvrDrive.'\\'.$SvrProjName.'\\'."_tcDesc.txt","$File_Find_name\t$propertyOp_=$rst\n")				;
 				if ($rst =~ /\n/) {
 					print "$File_Find_name\t$propertyOp_=\n$rst\n";
  					&appendtoFile_	($SvrDrive.'\\'.$SvrProjName.'\\'."_$propertyOp_.txt","$File_Find_name\t$propertyOp_=\n$rst\n")				;
@@ -210,7 +233,7 @@ sub recursiveSearchtcMain() {
 				&updateTestsuitePassFail ()	;
 				}
 				&updateWeb_(&getDir($File::Find::name),0, $borderWidth, "SOLID");
-				if ( &getDir($File::Find::name) =~ /_LBP/i) { $sleep4Display = 10; }
+				if ( &getDir($File::Find::name) =~ /_LBP/i) { $sleep4Display = 10; }	# todo: task specific
 				if (($tcOp !~ /list/) && ($tcOp !~ /mark/)) { sleep $sleep4Display;}
 			} elsif ( $scrollAmount != 0 ) {								# Handle different TC exec state
 				if       (($scrollAmount != 0 and $borderWidth== 0 )) { $borderWidth = 1; $borderStyle = "DOTTED"; }
@@ -223,8 +246,7 @@ sub recursiveSearchtcMain() {
 				&updateWeb_(&getDir($File::Find::name),$scrollAmount, $borderWidth, $borderStyle);
 				}
 			} ##################### TC Operation End ######################
-			if (&getExitTAFGracefullyLock() eq &getRoot_2($File::Find::name) ) { print "TAF exited gracefully\n"; &tcPost(); &releaseExitTAFGracefullyLock(); exit; } 
-			# if (&detectExitTAFGracefullyLock() =~ /\bLocked\b/i ) { print "TAF exited gracefully\n"; &tcPost(); exit; } 
+			if ((&getExitTAFGracefullyLock() eq &getRoot_2($File::Find::name)) || (&getExitTAFGracefullyLock() eq "exitTAF" ) ) { print "TAF exited gracefully\n"; &tcPost(); &releaseExitTAFGracefullyLock(); exit; } 
 				&generateRootIndex      ()	; 
 		   } 
 
@@ -249,7 +271,7 @@ sub tcPost {
 	&updateTestsuiteHTA     ()	;
 	&updateTestsuitePassFail()	;
 	$AutomationtsName   = "$SvrProjName";
-	&generateExcelReport	() 	;
+    	&generateExcelReport	() 	;	# here
 	########################################################
 } 
 
@@ -279,13 +301,10 @@ sub copyTS        { shift; print "copy $tsFrom -> $tsTo\n";
 
 sub generateTestsuiteByDesc {
 $SvrProjName =~ s/\\/\//g;
-# $tsFilterDefault =~ s/\\/\//g;
 &tcMain_1(); 
 1;
 }
 sub tcMain_1 { 
-	# print "	Scanning for testsuites at $tsFilterDefault ......\n"; 	
-	# find(\&recursiveSearchtcMain_1, $tsFilterDefault); print "	[fyi: -> $generateTestsuiteBAT]\n"; 
 	print "	Scanning for testsuites at $SvrProjName ......\n"; 	
 	find(\&recursiveSearchtcMain_1, $SvrProjName); print "	[fyi: -> $generateTestsuiteBAT]\n"; 
 1;
@@ -308,7 +327,6 @@ sub generateTS {
 
 	my $otherCmd = "copy (\"$tsDir/_tcLogAppend.txt\", \"$tsDirChild/_tcLogAppend.txt\")";
 	$ps1_args =~ s/\\/\//g;
-	# if ($tsHook =~ /\.ps1\s*$/)	{ $tsHook	= "powershell -executionpolicy unrestricted -file $tsHook $ps1_args "; }
 	if ($tsHook =~ /\.ps1\s*$/)	{ $tsHook	= "powershell -executionpolicy unrestricted -file $tsHook "; }
 
 my $perlCode=<<EOF_;
@@ -350,7 +368,7 @@ sub readTCDesc {
  		if ($each =~ /^\s*$/) {; }
  		elsif ($each =~ /^\s*_test/) { ; } 
  		else {
-			# $tcDesc[$ctr++] = $each;
+			#### $tcDesc[$ctr++] = $each;
  			$tcDesc[$ctr++] = $each."_full_";
  		}
  	}
@@ -386,21 +404,12 @@ find(sub { if (($File::Find::name =~ /index\.\w+$/i) && ($File::Find::name !~ /$
 			my $dirName =  $File::Find::name; $dirName =~ s/[\\|\/]index..+$//g; $tsFilterDefault =~ s/\\/\//g;
 			if ($dirName =~ /$tsFilterDefault/i) {
 			$ps1_args =~ s/ /___/g; 
-			# my $cmd = sprintf "$SvrDrive/$taf workingDir=$dirName;web_ui_title=$dirName;ps1_args=$ps1_args;generateTestsuite" ;  
-	$notUsegetTCName = 0;  #  here 
+			$notUsegetTCName = 0; 
 			my $cmd = sprintf "$SvrDrive/$taf testsuite=$dirName;web_ui_title=$dirName;ps1_args=$ps1_args;generateTestsuite" ;  
 			print "$cmd\n"; 
 			if ($doit =~ /\by\b/) { $cmd =~ s/\//\\/g; 
 				print "Running ... >>>>\n$cmd\n<<<<\n"; 
-				 		$workingDir = $dirName;
-				 		$SvrProjName = $dirName;
-				 $web_ui_title = $dirName;
-				 $ps1_args = $ps1_args;
-				 &generateTestsuite();
-				  
-				# my $rst = `$cmd`; 
-				#print $rst."\n";
-				# working on 
+				$workingDir = $dirName; $SvrProjName = $dirName; $web_ui_title = $dirName; $ps1_args = $ps1_args; &generateTestsuite();
 			}
 			}
 		}
@@ -493,8 +502,6 @@ find(sub { if ($File::Find::name =~ /index\.htm$/i) {
 			my $testsuite = $tmp2;
 			if ($tafProperty{$tmp2} ) { $tmp2 = sprintf("%-120s", $tafProperty{$tmp2}); }  # todo hardcoded 120
 			else { $tmp2 = sprintf("%-120s", $tmp2); }
-			# $tafUI{$tmp2}="<li><a href=\"$url".$tmp."\">$tmp2</a><a style=\"color:silver\">$SvrDrive$tmp</a>\n" if ($tmp ne "/index.htm");
-			# print "pa: $testsuite, getTSStatus=". &getTSMaxScrollAmount($testsuite). "\n";; # here
 			$tafUI{$tmp2}=" <marquee style=\"border:RED 0px SOLID\" width=48 direction=right behavior=alternate loop=10000 scrollamount=".&getTSMaxScrollAmount($testsuite).">*</marquee> <a href=\"$url".$tmp."\">$tmp2</a><a style=\"color:silver\">$SvrDrive$tmp</a>\n" if ($tmp ne "/index.htm");
 		}
 	 }, $SvrDrive);
@@ -812,14 +819,8 @@ sub initTAF {
 sub readTestSuitProperty {
 	if ( -e $SvrDrive.'/'.$SvrProjName.'/'."tsProperty.txt") {
 	open Fin, $SvrDrive.'/'.$SvrProjName.'/'."tsProperty.txt";
-	while ($_ = <Fin>) {
-		chop;
-		#	if ($web_ui_title =~ /Test Automation Framework/i) {
-			# if ($_ =~ /web_ui_title\s*:\s*(.+):\s*web_ui_title/)  { 
- 			if ($_ =~ /web_ui_title\s*:\s*(.+)\s*:\s*web_ui_title/)  { 
-			$web_ui_title = $1;
-			}
-			# }
+	while ($_ = <Fin>) { chop;
+ 		if ($_ =~ /web_ui_title\s*:\s*(.+)\s*:\s*web_ui_title/)  { $web_ui_title = $1; }
 		my $tcname, my $tcdesc;
 		($tcname, $tcdesc) = split /[\|]/, $_;
 		if ($tcdesc) {
@@ -955,29 +956,6 @@ sub addURLs {
 
 $return ;
 }
-
-#sub addURLs {
-#	my $return="";	
-#	foreach my $each (split "\n", shift ) {
-#
-#		$_ = $each;
-#		s/_/_underscore_/g; s/\s/_ws_/g; s/\./_dot_/g; s/\\/_backslash_/g; s/\//_slash_/g; s/:/_col_/g; s/-/_dash_/g; s/\(/_leftPara/g; s/\)/_rightPara/g;
-#		s/\W//g;
-#		s/\_ws_/ /g; s/_dot_/\./g; s/_backslash_/\\/g; s/_slash_/\//g; s/_col_/:/g; s/_dash_/-/g; s/_underscore_/_/g; s/_leftPara/\(/g; s/_rightPara/\)/g;
-#		if (($_ !~ /href=\"/) && ($_ =~ /(.+)($c\S+)\s?(.+)?/i)) { 
-#			my $match1 = $1; my $match2 = $2; my $match3=""; if ($3) {$match3 = $3;}
-#			if ($match2 =~ /\.txt\s*$/) { 
-#			$return = $return.$match1."<a href=\"file:////$match2\">$_</a>$match3\n";
-#			} else {
-#			$return = $return.$_."\n";
-#			}
-#		} else { 
-#			$return = $return.$_."\n";
-#		}
-#	} 
-#
-#$return ;
-#}
 
 sub ps12txt {
 	my $return="";	
@@ -1117,19 +1095,28 @@ while ($_ =<Fin>) {
 		$tcName = $1;	
 		$reportHtmlSummaryStr = $reportHtmlSummaryStr . "\n$tcName: ";
 		$_ = <Fin>;
-		if ($_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+)\s+/) {
+		if ($_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+)\s+/) { # always skip
 		$_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+)\s+/;
-		$passFail = $1; $dateTime= $2; $date1=&ParseDate($dateTime); 
+		$passFail = $1; $dateTime= $2; $date1=&ParseDate($dateTime);  my $title=" title=\"$dateTime\"";
 		if (&Date_Cmp( &ParseDate($initStartTime), &ParseDate($dateTime) ) >=0 ) { $initStartTime = $dateTime; }
 		if (&Date_Cmp( &ParseDate($endStartTime),  &ParseDate($dateTime) ) <=0 ) { $endStartTime  = $dateTime; }
-		if ($passFail =~ /pass/i) { $passFail = '<a style="color:green">*</a>';	} elsif ($passFail =~ /fail/i) { $passFail = '<a style="color:red">*</a>';} elsif ($passFail =~ /mark/i)  {$passFail ="|";}
+		# if ($passFail =~ /pass/i) { $passFail = '<a style="color:green">*</a>';	} elsif ($passFail =~ /fail/i) { $passFail = '<a style="color:red">*</a>';} elsif ($passFail =~ /mark/i)  {$passFail ="<a style=\"color:black\">|<\/a>";}
+		if ($passFail =~ /pass/i) { $passFail = '<a style="color:green"'.$title.'>*</a>';	} 
+		elsif ($passFail =~ /fail/i) { $passFail = '<a style="color:red"'.$title.'>*</a>';} 
+		elsif ($passFail =~ /mark/i)  {$passFail ="<a style=\"color:black\"$title>|<\/a>";}
 		$reportHtmlSummaryStr = $reportHtmlSummaryStr . $passFail;
 		}
 	} elsif (/^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+\s+)/) {
-		$_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+\s+)/;
-		$passFail = $1; $dateTime= $2;
-		if ($passFail =~ /pass/i) { $passFail = '<a style="color:green">*</a>';	} elsif ($passFail =~ /fail/i)  { $passFail = '<a style="color:red">*</a>';} elsif ($passFail =~ /mark/i) {$passFail ="|";} elsif ($passFail =~ /null/i) { $passFail = "_";}
-		$date2=&ParseDate($dateTime); 
+		# $_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+\s+)/;
+		$_ =~ /^\s+(\w+)\s+\w+\s+(\d+\-\d+\-\d+\s+\d+:\d+:\d+)\s+(.+)/;
+		my $note=$3;
+		$passFail = $1; $dateTime= $2; $date2=&ParseDate($dateTime); 
+		my $title = " title=\"$dateTime $note\""; 
+
+		if ($passFail =~ /pass/i) { $passFail = '<a style="color:green"'.$title.'>*</a>';	} 
+		elsif ($passFail =~ /fail/i)  { $passFail = '<a style="color:red"'.$title.'>*</a>';} 
+		elsif ($passFail =~ /mark/i) {$passFail ='<a style="color:black"'.$title.'>|</a>';} 
+		elsif ($passFail =~ /null/i) { $passFail = '<a style="color:black"'.$title.'>_</a>';}
 		if (&Date_Cmp( &ParseDate($initStartTime), &ParseDate($dateTime) ) >=0 ) { $initStartTime = $dateTime; }
 		if (&Date_Cmp( &ParseDate($endStartTime),  &ParseDate($dateTime) ) <=0 ) { $endStartTime  = $dateTime; }
 
@@ -1140,8 +1127,6 @@ while ($_ =<Fin>) {
 		} else {
 		$totalMIN = 0;
 		}
-
-
 		$reportHtmlSummaryStr = $reportHtmlSummaryStr . $passFail;
 	}
 }
@@ -1180,7 +1165,6 @@ sub reportTCHistory {
 	$tcIdCtr=1;
  	&createFile_($SvrDrive.'/'.$SvrProjName.'/'.$reportHtmlHistory,"");
  	&appendtoFile_($SvrDrive.'/'.$SvrProjName.'/'.$reportHtmlHistory,"<html><body><pre>\n");
-# find(sub { if ($File::Find::name =~ /tc\.pl$/i) {
 find(sub { if (  ($File::Find::name =~ /tc.pl\s*$/) && ($File::Find::name =~ /$SvrDrive\/$SvrProjName\/$testcaseNode/i) && ($File::Find::name =~ /$SvrTCNamePattern/i)  ) { # fix tcDesc tag related 
 			$SvrTCName = $File::Find::name; 
 			$SvrTCName =~ s/\/tc.pl//g;
@@ -1213,7 +1197,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
     my $returnValue="";
     my ($propertyName, $startTime, $endTime, $comment1, $comment2) ;
     my $passCtr =0; my $failCtr = 0; my $totalTime=0; my $avgResponseTime; my $propertyValue ='';
-    my $totalTimeDummy; my $passFailDisplay="";
+    my $totalTimeDummy; my $passFailDisplay=""; my $passFailDisplay_ ="";
 	&readTestSuitProperty();
     if( $propertyPattern =~ /^\s*$/) {   $propertyPattern = 'tcRunResult';}
     if( $reportType =~ /^\s*$/) {   $reportType = 'lastValue';}
@@ -1247,10 +1231,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
      }		
      close Fin;
 
-# todo no-intellegence now 	if (($passFailDisplayWidth < $tcPassFailDisplayWidth) and ($tcPassFailDisplayWidth < $maxPassFailDisplayWidth)) { $passFailDisplayWidth = $tcPassFailDisplayWidth; }
-# todo	else { $passFailDisplayWidth = $maxPassFailDisplayWidth;}
-
- 
+    my $passFailDisplayWidth_1st= 0;
     ############ get maxPassFailDisplayWidth #################
     open Fin, "$tcname/thProperty.txt" || die "Can't open file:$!"; 	################## Read Property File
     ############################## Read Property File to update reportHtmlHistory ###########################
@@ -1267,10 +1248,17 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 		if ($propertyValue =~ /^\s*[\d|.]+\s*$/) { $totalSec = $propertyValue; $propertyValue = "Perf";}
              if ( $isInSpan == 1 ) {
 		 if ( $propertyPattern =~ /tcRunResult/i ) {
-		      $beautifiedStr = sprintf "%15s %-15s %-25s%-s", $propertyValue, $totalSec.'s', $startTime, $comment1;
+			 # $beautifiedStr = sprintf "%15s %-15s %-25s%-s", $propertyValue, $totalSec.'s', $startTime, $comment1;
+		      $beautifiedStr = sprintf "%15s %-15s %-25s%-20s Note: %s", $propertyValue, $totalSec.'s', $startTime, $comment1, $comment2; # add comment2 for mouse-over display
+
 		      if ($propertyValue =~ /pass/i) {$passCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."p";}
 		      if ($propertyValue =~ /fail/i) {$failCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."f";}
 		      if ($propertyValue =~ /mark/i) {          ; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."m";}
+
+		      if ($propertyValue =~ /pass/i) {                                                $passFailDisplay_ = $passFailDisplay_."p $startTime: ${comment2}_|_";}
+		      if ($propertyValue =~ /fail/i) {                                                $passFailDisplay_ = $passFailDisplay_."f $startTime: ${comment2}_|_";}
+		      if ($propertyValue =~ /mark/i) {                                                $passFailDisplay_ = $passFailDisplay_."m $startTime: ${comment2}_|_";}
+		      if ($propertyValue =~ /pass|fail|mark/i) { $passFailDisplayWidth_1st ++ ; }
 		 } else {
                  	$beautifiedStr = $_;
              	 }    # endif for /tcRunResult/
@@ -1287,8 +1275,11 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 	     } # endif for InSpan
          }    # endif for /propertyPattern/
     }									##################### 
-    ############################## Read Property File to update reportHtmlHistory ###########################
 
+    ############################## Adjust passFailDisplayWidth by _1st and max ###########################
+ 	if ( $passFailDisplayWidth < $passFailDisplayWidth_1st ) { $passFailDisplayWidth = $passFailDisplayWidth_1st;}
+ 	if ( $passFailDisplayWidth > $maxPassFailDisplayWidth  ) { $passFailDisplayWidth = $maxPassFailDisplayWidth ;}
+    ############################## Read Property File to update reportHtmlHistory ###########################
     	if ($passCtr + $failCtr == 0) {				##########  Generate TC webUI string 
 	$avgResponseTime = 0; } else {
 	$avgResponseTime = $totalTime / ($passCtr + $failCtr); 
@@ -1320,18 +1311,21 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 
 	# prHtml3 mark for search
 
+	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
 	my $tcSerialN = $TCDesc_display; if ($tcSerialN =~ /^\s*\d+\s+/) {$tcSerialN =~ /^\s*(\d+)\s+/; $tcSerialN = "$1"; if ($tcSerialN) {;} else {$tcSerialN = "";}}
 	my $dirRoot = &getRoot($tcname); 
 	my $TCCtrToolTip = sprintf "Run Test (Testcase Number == $tcSerialN [%s])", &timeConvert($avgResponseTime); 
 	my $TCCtrToolTipMin = sprintf "Run Tests (Testcase Number >= $tcSerialN)" ; 
 	my $TCScrollAmount = 0; my $CtrSeparator = "|";
-	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
-	my $tmp11= sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName exitTAFGracefullyString=$tcname;exitTAF')\" title=\"Stop Test (Testcase Number = $tcSerialN)\" >");
-	$passFailDisplay = &genPassFailDisplay($passFailDisplay);
-	my $tmp12 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseExec=$dirRoot;ExecutionType=runTC;Execution_24_7=y;exec')\"  title=\"Exec Test 24/7 (Testcase Number == $tcSerialN)\"> ,</a>"); 
-	my $tmp = sprintf( "<span style=\"color:black;\">$passFailDisplay${tmp11}.</a>$tmp12<font color=\"$color[$colorIndex]\"> <a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseExec=$dirRoot;ExecutionType=runTC;exec')\"  title=\"$TCCtrToolTip\">%s</a>  <a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;tcIdMin=$tcIdCtr;testsuit=$SvrProjName;ExecutionType=runTS;exec')\"  title=\"$TCCtrToolTipMin\"><marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>%s</marquee></a></font><a href=\"${url}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\">%-${webUI_TCDescWidth}s</a> <a href=\"${url}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">%5d/%-5d</a> %6d(s)       <font color=\"white\"> %s </font></span>\n",
-                    '>', 
-		    '>|', 
+	my $stopTS    = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName exitTAFGracefullyString=$tcname;exitTAF')\" title=\"Stop Test (Testcase Number = $tcSerialN)\" >.</a>";
+	my $runTS24_7 = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseExec=$dirRoot;ExecutionType=runTC;Execution_24_7=y;exec')\"  title=\"Exec Test 24/7 (Testcase Number == $tcSerialN)\"> ,</a>"; 
+	my $runTCOnce = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseExec=$dirRoot;ExecutionType=runTC;exec')\"  title=\"$TCCtrToolTip\">></a>";
+	my $runTSOnce = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName -s drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;tcIdMin=$tcIdCtr;testsuit=$SvrProjName;ExecutionType=runTS;exec')\"  title=\"$TCCtrToolTipMin\"><marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>>\|</marquee></a>"; 
+	$passFailDisplay  = &genPassFailDisplay ($passFailDisplay);
+	# $passFailDisplay_ = &genPassFailDisplay_ ($passFailDisplay_);
+	$passFailDisplay = &genPassFailDisplay_ ($passFailDisplay_);
+	# print "pa: $passFailDisplay\n$passFailDisplay_\n";
+	my $html = sprintf( "<span style=\"color:black;\">$passFailDisplay${stopTS}$runTS24_7<font color=\"$color[$colorIndex]\"> $runTCOnce $runTSOnce</font><a href=\"${url}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\">%-${webUI_TCDescWidth}s</a> <a href=\"${url}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">%5d/%-5d</a> %6d(s)       <font color=\"white\"> %s </font></span>\n",
 		    $TCDesc_display,
                     $passCtr,
                     $failCtr,
@@ -1341,7 +1335,7 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 
 	# http
 	# todo: http miss the runPropertyPattern and tcIdMin function, ExecutionType 
-	my $tmp_http = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"${urlHttp}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\"> %-80s</a> <a href=\"${urlHttp}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://$ip/$_TAF/$SvrProjName/$dirRoot/tc.hta\')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>%-5d</marquee></a></font>  %6d(s) <font color=\"white\"> %s </font></span></li>\n",
+	my $html_http = sprintf( "<li style=\"color:$color;\"><span style=\"color:black;\"><a href=\"${urlHttp}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\"> %-80s</a> <a href=\"${urlHttp}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">Pass/Fail</a>:<font color=\"$color[$colorIndex]\"> <a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://$ip/$_TAF/$SvrProjName/$dirRoot/tc.hta\')\"  title=\"$TCCtrToolTip\">%5d$CtrSeparator<marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>%-5d</marquee></a></font>  %6d(s) <font color=\"white\"> %s </font></span></li>\n",
 		    $TCDesc_display,
                     $passCtr,
                     $failCtr,
@@ -1351,11 +1345,11 @@ sub reportTC() {		# TC Report Function (TH:TC Report)
 
 
 		if ($cmd =~ /noprint/i) {;} else { 
-			&appendtoFileUniq_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1, $tmp 		);
-			&updateWeb1_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $tmp			);  
+			&appendtoFileUniq_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1, $html 		);
+			&updateWeb1_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $html			);  
 
-			 	&appendtoFileUniq_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http, $tmp_http 	); 
-			&updateWeb1Http_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $tmp_http		); 
+			 	&appendtoFileUniq_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml1_http, $html_http 	); 
+			&updateWeb1Http_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $html_http		); 
 		 } 
      	close Fin;
      	if ($returnValue) {$returnValue =~ s/^\s*//g;} else {$returnValue = "";} 
@@ -1371,6 +1365,23 @@ sub genPassFailDisplay {
 	$str =~ s/f/<a style=\"color:red\">*<\/a>/g;
 	$str =~ s/m/|/g;
 	if ($str =~ /^\s*$/) { $str = &genStr($passFailDisplayWidth);}
+	return $str; 
+}
+
+sub genPassFailDisplay_ {
+	my $str = shift; my $str_ =""; my $strLenCtr=0;
+	@_ = split /_\|_/, $str; $str="";
+	for (my $i=$#_; $i >= 0; $i--) { 
+		my $tcResult ; 
+		if( $_[$i] =~ s/^\s*(\w)\s+//g) {
+			$tcResult = $1; $str_ = $_[$i];  $strLenCtr++;
+			if ($tcResult =~ /p/i)    { $str = $str."<a style=\"color:green\" title=\"$str_\">*<\/a>"; }
+			elsif ($tcResult =~ /f/i) { $str = $str."<a style=\"color:red\" title=\"$str_\">*<\/a>";   }
+			elsif ($tcResult =~ /m/i) { $str = $str."<a style=\"color:black\" title=\"$str_\">|<\/a>"; }
+		}
+		if ($strLenCtr + 1 > $passFailDisplayWidth) { return $str; }
+	} 
+	if ($strLenCtr < $passFailDisplayWidth) { for (my $i = $strLenCtr; $i < $passFailDisplayWidth; $i++) { $str = $str . "<a style=\"color:blank\"> <\/a>"; } }
 	return $str; 
 }
 
@@ -1409,6 +1420,7 @@ sub processTCs{
 	@_ = split /;/, $tmp;
 	&genDriver_taf_pl ();
 	foreach my $each (@_) {
+		print " cmd> $each\n";
 		if ($each !~ /=/) {
 			$isBatchProcessing = 0;
 			if (($each =~ /\blistVars\b/i) || ($each =~ /\bgetVars\b/i)) { return &getGlobalVars()	;
@@ -1442,16 +1454,18 @@ sub processTCs{
 			if ( $each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/ ) {
 			$each =~ /^\s*(\S+)\s*=\s*(\S+)\s*/; my $varName = $1; my $varValue = $2		;
 			if (($varName !~ /^\s*$/) && ($varValue !~ /^\s*$/)) {
-				$isBatchProcessing = 1;
+				$isBatchProcessing = 0;
 				if (&setGlobalVars ("","$varName=$varValue;") == 1 ) 		{ ; }
 				else {
-					$isBatchProcessing = 0; my $rst = &processTC("",$each) 			;
+					# $isBatchProcessing = 0; my $rst = &processTC("",$each) 			;
+					my $rst = &processTC("",$each) 			;
 				}
 			}
-			}
+			} else { next; } 
 		}
+	if ($isBatchProcessing == 1) { $NofExecutionCtr=0; &tcLoop();}		# NofExecutionCtr reset for each list/exec
 	} 
-	if ($isBatchProcessing == 1) {&tcLoop();}
+	# if ($isBatchProcessing == 1) {&tcLoop();}
 }
 
 ################################################################################
@@ -1515,7 +1529,9 @@ sub processTC {
 
 	    } elsif ( $tcOP =~ /^\s*list|get\b/i ) {
 		    $rst = &getProperties(&getTCName($tcname) , 'tcRunResult', 'latest');
-		    if ( $makeMark =~ /y/i) {$rst = &markTC_($tcname); $makeMark ="n";}
+		    if ( $makeMark =~ /y/i) {$rst = &markTC_($tcname);}
+		    #if ( $makeMark =~ /y/i) {$rst = &markTC_($tcname); $makeMark ="n";}
+
 		    # todo !!! Might break other functions !!!
 		    # if (defined $cmd) { $rst =  &reportTCHistory($tcname); } else { $rst = &reportTC($tcname,"","lastValue") ; }
             } elsif ( $tcOP =~ /^\s*delete/i ) {
@@ -1809,7 +1825,7 @@ sub markTC_ {
 	       } else {
 	       $rstStr .= "Functional Test ($rst) ";
 	       } 
-	       $rstStr .= '|comment2'; 
+	       $rstStr .= '|'.$tcComment2; 
 	       &addProperty(&getTCName($tcName), "add=$rstStr");
 	       return $rst;
        } else {
@@ -2295,6 +2311,8 @@ sub setGlobalVars {
 		elsif ($varName =~ /\bAutomationtsName\b/i)     { $AutomationtsName= $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bresetTSFileName\b/i)      { $resetTSFileName = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bexitTAFTCId\b/i)          { $exitTAFTCId 	   = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btcComment1\b/i)            { $tcComment1	   = $varValue; $foundMatch = 1;}
+		elsif ($varName =~ /\btcComment2\b/i)            { $tcComment2	   = $varValue; $foundMatch = 1;}
 	my $exitTAFTCId		;
 	}
 	$foundMatch;
@@ -3159,8 +3177,11 @@ sub genDriver_taf_pl {
 }
 sub genDriver {
 	if ($workingDir =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from a directory.'; exit}
-	mkpath  $SvrDrive ;
-	if (-e "$c/$_TAF/taf.pl") {;} else {
+	mkpath  "$c/$_TAF";
+
+		print "pa:$c/$_TAF\n";
+	if (-e "$c/$_TAF/taf.pl") {
+		;} else {
 	open Fout, ">$c/$_TAF/taf.pl";
 	print Fout &prDriver(1);
 	close Fout;
@@ -3199,8 +3220,8 @@ $c\\$_TAF\\taf.pl testsuite=_testsuite3_;create=_testcase9_/overwrite,expectedFa
 REM exec all test_suite (testsuite!= Regexp; testcase=RegExp)
 
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;exec
-$c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;testcase=*;exec
-$c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;testcase=testcase1*;exec
+$c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;testcase=.*;exec
+$c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;testcase=testcase.1*;exec
 
 $c\\$_TAF\\taf.pl testsuite=_testsuite2_;testType=tc;exec
 $c\\$_TAF\\taf.pl testsuite=_testsuite3_;testType=tc;exec
@@ -3216,10 +3237,10 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite4_;exec
 
 
 REM test execution status (1. moving symbol = test-in-prog 2. Current execution status = getWeb_ 3. delete TS
-$c\\$_TAF\\taf.pl testsuit=_testsuite1_;testType=tc;
-$c\\$_TAF\\taf.pl testsuit=_testsuite2_;testType=tc;
-$c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;
-$c\\$_TAF\\taf.pl testsuit=_testsuite4_;testType=tc;
+$c\\$_TAF\\taf.pl testsuit=_testsuite1_;testType=tc;list
+$c\\$_TAF\\taf.pl testsuit=_testsuite2_;testType=tc;list
+$c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;list
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;testType=tc;list
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=_testcase1_/2
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=_testcase2_/1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=_testcase3_/3
@@ -3329,7 +3350,8 @@ $c\\$_TAF\\taf.pl printTestBedProperties;generateRootIndex
 
 rem todo: property operation and property filter
 
-
+rem Mark TS with comments
+rem taf.pl testsuite=_testsuite1_;tcComment2=abcd;mark 
 \@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\$_TAF\\_testsuite3_\\index.htm"
 
 REM Job-specific (LBP) Check if it is integrated in [c|d|e]:\\_TAF\\index.pl
@@ -3791,11 +3813,70 @@ sub getRoot { my $string = shift; @_ = split /\\|\//, $string; return $_[$#_]; }
 sub getDir  { my $string = shift; my $root =&getRoot($string); $string =~ s/([\\|\/])?$root//i; return $string;  }
 sub getRoot_1 { my $string = shift; @_ = split /\\|\//, $string; return $_[$#_-1]; }	# remove tc.pl
 
+sub prHtml1_strGen() {
+	my $localUrl = $url; $localUrl = shift if @_;	
+	my $tcPropertyPatternPattern_ = ".*"; ####################### Reset the tcPropertyPatternPattern for index.htm
+	my $testsuiteTotalExecTime =  &getTestsuiteTotalExecTime ("$SvrDrive/$SvrProjName/$reportHtml1"); 
+	my $tcDescTitle = "<a href=\"${localUrl}/$SvrProjName/_generateExcelReport.html\" title=\"Link to Daily Report. Below link to TC Logs\">"; 
+	   $tcDescTitle = sprintf "$tcDescTitle%-${webUI_TCDescWidth}s</a>","   ------------------Testcase Description------------------";
+	my $TCCtrToolTip = sprintf "Run Test Suite 24/7 (Avg Time is $testsuiteTotalExecTime)"; 
+	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
+	my $execTS = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;Execution_24_7=y;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;exec')\" title=\"$TCCtrToolTip\"> Exec</a>");
+	my $stopTS = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName exitTAFGracefullyString=exitTAF;exitTAF')\" title=\"Stop Test Execution gracefully\" >.</a>");
+	my $markTS = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;Execution_24_7=n;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;mark')\" title=\"Make the beginning of a execution by \|\"> \|</a>");
+	my $indexFailed = sprintf("<a href=\"${localUrl}/$SvrProjName/index_failed.htm\" title=\"Display *Failed* TCs\">Fail</a>");
+	my $indexPassed = sprintf("<a href=\"${localUrl}/$SvrProjName/index_passed.htm\" title=\"Display *Passed* TCs\">Pass</a>");
+	my $indexOthers= sprintf("<a href=\"${localUrl}/$SvrProjName/index_others.htm\" title=\"Display *others* TCs\">/</a>");
+	my $indexUrlIIS = sprintf("<a href=\"${url}/$SvrProjName/index_http.htm\" title=\"Run TAF-Team Version based on IIS/http\"> <font color=\"white\">TC Manual Command</font></a>");
+	my $indexSeconds = "<a title=\"Execution time = $testsuiteTotalExecTime (s) \">(sec)</a>";
+	my $indexTitle = sprintf("<a href=\"${localUrl}/index.htm\" title=\"Run TAF-Team Version based on IIS/http\">$web_ui_title</a>");
+	my $indexResult = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtmlSummary\" title=\"Latest TC pass/fail (Gree/Red) Click to Display Test Suite Summary\">".substr ("Results                                                                                                                                               ", 0, $passFailDisplayWidth)."</a>"); # todo fix length Result...
+	my $tmp10 = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtmlSummary\" title=\"$reportHtmlSummaryStr\">");
+	my $passFailDisplay = &genPassFailDisplay("");
+	
+my $indexHtml =<<EOF;
 
+<html>
+<head> 
+<META http-equiv="refresh" content="20"> 
+		<HTA:APPLICATION ID="oMyApp" 
+		    APPLICATIONNAME="Application Executer" 
+		    BORDER="no"
+		    CAPTION="no"
+		    SHOWINTASKBAR="yes"
+		    SINGLEINSTANCE="yes"
+		    SYSMENU="yes"
+		    SCROLL="no"
+		    WINDOWSTATE="normal">
+	<script language="JavaScript">
+		function RunFile(file) {
+			// alert("file is " + file );
+			WshShell = new ActiveXObject("WScript.Shell");
+			WshShell.Run(file, 1, false);
+		}
+
+		function RunFileHTTP(testsuite, testcase) {
+			// alert("testsuite is " + testsuite + " testcase is " );
+			WshShell = new ActiveXObject("WScript.Shell");
+		    	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /delete /tn TAF_'+ testsuite + '_' + testcase + ' /f'; WshShell.Run(cmd, 1, false);
+			cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /create /TR "$c\\\\$_TAF\\\\taf.pl testsuit='+testsuite+';testcaseExec='+testcase+';exec" /TN TAF_'+testsuite+'_'+testcase+' /sc monthly /mo 1 /F'; WshShell.Run(cmd, 1, false);
+    		  	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /run /tn TAF_'+testsuite+'_'+testcase; WshShell.Run(cmd, 1, false);
+		}
+		// <body OnLoad ="function1()">
+	</script>
+</head>
+<script type="text/javascript"> if (navigator.appName != "Microsoft Internet Explorer") alert("Please use IE to access TAF's webUI") </script>
+<body>
+<pre>
+<p>
+<h2>${indexTitle}</h2> 
+${indexResult}${stopTS}${markTS}${execTS} <a title=\"Click Testcase Desc to view TC logs\">$tcDescTitle     ${indexPassed}${indexOthers}${indexFailed}       ${indexSeconds}       ${indexUrlIIS}  </span>
+EOF
+
+	return $indexHtml; 
+	}
 sub prHtml1 {		# print index.htm beginnings
 	my $tcPropertyPatternPattern_ = ".*"; ####################### Reset the tcPropertyPatternPattern for index.htm
-#	&readTestSuitProperty (); 	# Read web_ui_title 
-	# my $testsuiteTotalExecTime =  &getTestsuiteTotalExecTime ("$SvrDrive/$SvrProjName/index.htm"); 
 	my $testsuiteTotalExecTime =  &getTestsuiteTotalExecTime ("$SvrDrive/$SvrProjName/$reportHtml1"); 
 &createFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, '' );
 &createFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, '' );
@@ -3805,127 +3886,70 @@ taf.bat      : TAF testbed setup
 tc.pl        : TC hook       
 _tcAppend.txt: TC log  hook 
 EOF
-	my $tmpDesc1 = sprintf("<a href=\"${url}/$SvrProjName/_generateExcelReport.html\" title=\"Link to Daily Report. Below link to TC Logs\">");
-	my $tmpDesc2 = sprintf "%-${webUI_TCDescWidth}s", "                  Testcase Description"; 		
-	my $strTmp   = sprintf "%-${webUI_TCDescWidth}s", "                  Testcase Description"; 		
-	   $strTmp = $tmpDesc1.$tmpDesc2;
-	my $TCCtrToolTip = sprintf "Run Test Suite 24/7 (Avg Time is $testsuiteTotalExecTime)"; 
-	my $perl = $^X;  $perl =~ s/\\/\\\\/g;
-	my $tmp1 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;Execution_24_7=y;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;exec')\" title=\"$TCCtrToolTip\">");
-	my $tmp11= sprintf("<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName exitTAF')\" title=\"Stop Test Execution gracefully\" >");
-	my $tmp2 = sprintf("<a href=\"${url}/$SvrProjName/index_failed.htm\" title=\"Display *Failed* TCs\">");
-	my $tmp3 = sprintf("<a href=\"${url}/$SvrProjName/index_passed.htm\" title=\"Display *Passed* TCs\">");
-	my $tmp31= sprintf("<a href=\"${url}/$SvrProjName/index_others.htm\" title=\"Display *others* TCs\">/</a>");
-	my $tmp4 = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http.htm\" title=\"Run TAF-Team Version based on IIS/http\"> <font color=\"white\">TC Exec Command</font></a>");
-	my $tmp5 = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http.htm\" title=\"Run TAF-Team Version based on IIS/http\">TC Exec Command</a>");
-	my $tmp6 = "<a title=\"Execution time = $testsuiteTotalExecTime (s) \">(sec)</a>";
-	my $tmp7 = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http.htm\" title=\"Run TAF-Team Version based on IIS/http\"> <font color=\"white\">");
-	my $tmp8 = sprintf("<a href=\"${url}/index.htm\" title=\"Run TAF-Team Version based on IIS/http\">");
-	my $tmp9 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtmlSummary\" title=\"Display TC Summary\">");
-	my $tmp9A = sprintf("<a href=\"${url}/$SvrProjName/$reportHtmlSummary\" title=\"Latest TC pass/fail (Gree/Red) Click to Display Test Suite Summary\">");
-	my $tmp9B = "Results                                                                                                                              ";
-	   $tmp9B = substr ($tmp9B, 0, $passFailDisplayWidth);
-	my $tmp10 = sprintf("<a href=\"${url}/$SvrProjName/$reportHtmlSummary\" title=\"$reportHtmlSummaryStr\">");
-	my $passFailDisplay = &genPassFailDisplay("");
-	
-my $tmp =<<EOF;
 
-<html>
-<head> 
-<META http-equiv="refresh" content="20"> 
-		<HTA:APPLICATION ID="oMyApp" 
-		    APPLICATIONNAME="Application Executer" 
-		    BORDER="no"
-		    CAPTION="no"
-		    SHOWINTASKBAR="yes"
-		    SINGLEINSTANCE="yes"
-		    SYSMENU="yes"
-		    SCROLL="no"
-		    WINDOWSTATE="normal">
-	<script language="JavaScript">
-		function RunFile(file) {
-			// alert("file is " + file );
-			WshShell = new ActiveXObject("WScript.Shell");
-			WshShell.Run(file, 1, false);
-		}
+my $indexHtml = &prHtml1_strGen($url); 
+&appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $indexHtml);
 
-		function RunFileHTTP(testsuite, testcase) {
-			// alert("testsuite is " + testsuite + " testcase is " );
-			WshShell = new ActiveXObject("WScript.Shell");
-		    	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /delete /tn TAF_'+ testsuite + '_' + testcase + ' /f'; WshShell.Run(cmd, 1, false);
-			cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /create /TR "$c\\\\$_TAF\\\\taf.pl testsuit='+testsuite+';testcaseExec='+testcase+';exec" /TN TAF_'+testsuite+'_'+testcase+' /sc monthly /mo 1 /F'; WshShell.Run(cmd, 1, false);
-    		  	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /run /tn TAF_'+testsuite+'_'+testcase; WshShell.Run(cmd, 1, false);
-		}
-		// <body OnLoad ="function1()">
-	</script>
-</head>
-<script type="text/javascript"> if (navigator.appName != "Microsoft Internet Explorer") alert("Please use IE to access TAF's webUI") </script>
-<body>
-<pre>
-<p>
-<h2> ${tmp8}$web_ui_title</a></h2> 
-${tmp9A}${tmp9B}</a>${tmp1}Execution </a>  <a title=\"Click Testcase Desc to view TC logs\">$strTmp</a>    ${tmp3}Pass</a>${tmp31}${tmp2}Fail</a>      ${tmp6} <a title=\"pass/fail counts\">      ${tmp7}Exec T</font></a>        <a title=\"Manual command to exec TC\">   ${tmp4}  </span>
-EOF
+############## Process Http html 
+#my $tmp1_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://$ip/$_TAF/$SvrProjName/ts.hta\')\"  title=\"$TCCtrToolTip\" > "); 
+#my $indexFailed_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_failed.htm\" title=\"Click to display *Failed* TCs\">Fail</a>"); 
+#my $indexPassed_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_passed.htm\" title=\"Click to display *Passed* TCs\">Pass</a>");
+#my $indexOthers_http= sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_others.htm\" title=\"Click to display *Others* TCs\">/</a>");
+#my $indexUrlIIS_http = sprintf("<font color=\"white\">TC Exec Command</font>");
+#my $indexSeconds_http = "<a title=\"Execution time = ".  $testsuiteTotalExecTime ."(s) \">(sec)</a>";
+#my $tmp7_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index.htm\" title=\"Click to run TAF-PC Version with NO IIS/http\">");
+#my $indexHtml_http =<<EOF;
+#
+#<html>
+#<head> 
+#<META http-equiv="refresh" content="20"> 
+#		<HTA:APPLICATION ID="oMyApp" 
+#		    APPLICATIONNAME="Application Executer" 
+#		    BORDER="no"
+#		    CAPTION="no"
+#		    SHOWINTASKBAR="yes"
+#		    SINGLEINSTANCE="yes"
+#		    SYSMENU="yes"
+#		    SCROLL="no"
+#		    WINDOWSTATE="normal">
+#	<script language="JavaScript">
+#		function RunFile(file) {
+#			// alert("file is " + file );
+#			WshShell = new ActiveXObject("WScript.Shell");
+#			WshShell.Run(file, 1, false);
+#		}
+#
+#		function RunFileHTTP(testsuite, testcase) {
+#			// alert("testsuite is " + testsuite + " testcase is " );
+#			WshShell = new ActiveXObject("WScript.Shell");
+#		    	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /delete /tn TAF_'+ testsuite + '_' + testcase + ' /f'; WshShell.Run(cmd, 1, false);
+#			cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /create /TR "$c\\\\$_TAF\\\\taf.pl testsuit='+testsuite+';testcaseExec='+testcase+';exec" /TN TAF_'+testsuite+'_'+testcase+' /sc monthly /mo 1 /F'; WshShell.Run(cmd, 1, false);
+#    		  	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /run /tn TAF_'+testsuite+'_'+testcase; WshShell.Run(cmd, 1, false);
+#		}
+#		// <body OnLoad ="function1()">
+#	</script>
+#</head>
+#<script type="text/javascript"> if (navigator.appName != "Microsoft Internet Explorer") alert("Please use IE to access TAF's webUI") </script>
+#<body>
+#<pre>
+#<p>
+#<h2> $web_ui_title </h2>
+#<a title=\"latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Click Testcase Descriptoin to view logs \">$tcDescTitle          -${indexPassed_http}${indexOthers_http}${indexFailed_http}-  <a title=\"pass/fail counts\">${tmp1_http}Counters</a>  Exec T $indexSeconds_http     <a title=\"Manual command to exec TC\">     ${indexUrlIIS_http} </a> </span>
+#EOF
+#
 
-&appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $tmp);
-my $tmp1_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/$reportHtml_http\" onClick=\"RunFile(\'http://$ip/$_TAF/$SvrProjName/ts.hta\')\"  title=\"$TCCtrToolTip\" > "); 
-my $tmp2_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_failed.htm\" title=\"Click to display *Failed* TCs\">"); 
-my $tmp3_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_passed.htm\" title=\"Click to display *Passed* TCs\">");
-my $tmp31_http= sprintf("<a href=\"${urlHttp}/$SvrProjName/index_http_others.htm\" title=\"Click to display *Others* TCs\">/</a>");
-my $tmp4_http = sprintf("<font color=\"white\">TC Exec Command</font>");
-my $tmp6_http = "<a title=\"Execution time = ".  $testsuiteTotalExecTime ."(s) \">(sec)</a>";
-my $tmp7_http = sprintf("<a href=\"${urlHttp}/$SvrProjName/index.htm\" title=\"Click to run TAF-PC Version with NO IIS/http\">");
-my $tmp_http =<<EOF;
-
-<html>
-<head> 
-<META http-equiv="refresh" content="20"> 
-		<HTA:APPLICATION ID="oMyApp" 
-		    APPLICATIONNAME="Application Executer" 
-		    BORDER="no"
-		    CAPTION="no"
-		    SHOWINTASKBAR="yes"
-		    SINGLEINSTANCE="yes"
-		    SYSMENU="yes"
-		    SCROLL="no"
-		    WINDOWSTATE="normal">
-	<script language="JavaScript">
-		function RunFile(file) {
-			// alert("file is " + file );
-			WshShell = new ActiveXObject("WScript.Shell");
-			WshShell.Run(file, 1, false);
-		}
-
-		function RunFileHTTP(testsuite, testcase) {
-			// alert("testsuite is " + testsuite + " testcase is " );
-			WshShell = new ActiveXObject("WScript.Shell");
-		    	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /delete /tn TAF_'+ testsuite + '_' + testcase + ' /f'; WshShell.Run(cmd, 1, false);
-			cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /create /TR "$c\\\\$_TAF\\\\taf.pl testsuit='+testsuite+';testcaseExec='+testcase+';exec" /TN TAF_'+testsuite+'_'+testcase+' /sc monthly /mo 1 /F'; WshShell.Run(cmd, 1, false);
-    		  	cmd = '$c\\\\windows\\\\system32\\\\schtasks.exe /run /tn TAF_'+testsuite+'_'+testcase; WshShell.Run(cmd, 1, false);
-		}
-		// <body OnLoad ="function1()">
-	</script>
-</head>
-<script type="text/javascript"> if (navigator.appName != "Microsoft Internet Explorer") alert("Please use IE to access TAF's webUI") </script>
-<body>
-<pre>
-<p>
-<h2> $web_ui_title </h2>
-<a title=\"latest Test Result pass/fail = Green/Red\">L</a>            <a title=\"Click Testcase Descriptoin to view logs \">$strTmp</a>          -${tmp3_http}Pass</a>${tmp31_http}${tmp2_http}Fail</a>-  <a title=\"pass/fail counts\">${tmp1_http}Counters</a>  Exec T $tmp6_http     <a title=\"Manual command to exec TC\">     ${tmp4_http} </a> </span>
-EOF
-
-
-&appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $tmp_http);
+my $indexHtml_http = &prHtml1_strGen($urlHttp); 
+&appendtoFile_ ($SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $indexHtml_http);
 }
 
 sub prHtml2 {	# print index.htm endings
-my $tmp =<<EOF;
+my $html =<<EOF;
 </pre></body>
 </html>
 <style type="text/css"> a { text-decoration:none} </style> 
 EOF
- &appendtoFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $tmp );
- &appendtoFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $tmp );
+ &appendtoFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml, $html );
+ &appendtoFile_( $SvrDrive.'\\'.$SvrProjName.'\\'.$reportHtml_http, $html );
 }
 
 
@@ -4164,24 +4188,32 @@ sub call_index { 		my $return ; my $recordCtr=1;
 }
 
 #################### Todo list: Functional Requirements ##########################
-# * generateIndex (including generateRootIndex) based on scanTestsuite - works. but index.htm has a lock on it?  (investigation)
+# * duplicated records in webUI (possible reason/solution) testcaseNode (solution: testcaseNode?)
+# * fix todo in the code
+# * create testbed regression 
+# * generateRootIndex copy index.htm_ to index.htm doens't work on some system (need exit IE/index.htm or manual copy)
 # * there is recursive call on scanTestsuite (call list)
-# * multi-TS Execution sequentially or concurrently
-# * global $index 
-# * multiple tppp filters 	(Very difficult/Low priority)
-# * generateExcelReport has $rst = `$cmd`. should &func() 
-# * Animate Testsuite bulletin. - generateRootIndex ? 
-# * run multi-Testsuites sequentially
-# * Notif for the expected failure
-# * handle unexpected reboot scenario
+# * add Regexp::Assemble->new; 		 in the build process
 # * add File::Copy::Recursive dependency in the build process
-# * add Regexp::Assemble->new; 		in the build process
-# * generate taf.pl on e: (other than c:)
-# * Extra searial#. was added in the code. - Remove it  (guess: thProperty.txt)
-# * duplicated records in webUI (possible reason/solution) testcaseNode
+# * generate the index_http.htm. 					-In progress (12/26/2012 onhold wait for RubyOnRail)
+# * Animate Testsuite bulletin. - generateRootIndex ? 			-in Prog (need testing)
+# * Extra searial#. was added in the code. thProperty.txt) - as designed-done 01/01/2012
+# * Mark automation every day  by            sub getExecDay 		-done 01/04/2013
+# * Full width passFailString (index_Full_Length.htm) 	Add intelegent 	-done 01/02/2012
+# * Mark with Automation Note/Mouse Over display 			-done 01/01/2013
+# * MouseOver * in the Automation history				-done 12/26/2012 
+# * generate taf.pl on e: (other than c:)  taf.pl _TAF=tmp\tmp;genDriver-done 12/26/2012
+# * generateExcelReport has $rst = `$cmd`. should &func() 		-done 12/26/2012
+# * add Mark by "|" in webUI						-done 12/21/2012
+# * add stop TS by "." in webUI						-done 12/21/2012
+# * multiple command in squence: list;exec;list;exec			-done 12/18/2012 
+# * scan TS under c:\_TAF\ doen't work yet. (errous test bed)		-done 12/20/2012
+# * fix bug ps1_arg1= bug	In processTCS				-done 12/20/2012 
+# * add function: exitTAFGracefully for any TC  .Execution		-done 12/20/2012
+# * multiple commands separated by ;	$isBatchProcessing == 1) { $NofExecutionCtr=0; &tcLoop();} -done 12/18/2012
 # * add refresh function to c:\_TAF\index.htm				-done 12/14/2012
 # * Stop a specific test execution					-done 12/13/2012 
-# * Repeat a specific test case	($tmp12)				-done 12/13/2012
+# * Repeat a specific test case	($markTS)				-done 12/13/2012
 # * GeneratePowershellShellTS 						-done 06/06/2012
 # * create ps1 testsuite createTS and its test cases			-done 06/01/2012
 # * integrate gerneatePShellTestsuite 					-done 06/06/2012
@@ -4201,9 +4233,19 @@ sub call_index { 		my $return ; my $recordCtr=1;
 * # addURLs will add date-time to the log fname 			-done 12/13/2012
 ###############################################
 
+############# Low Priority Requirement/Bugs #########
+#   Need to setup IIS and _TAF as a virtual directory documentation 
+# * multiple tppp filters 	(Very difficult/Low priority)
+# * Notif for the expected failure
+# * bug: when there is no TC in a TS, the TS * is default to move 
+# * generateIndex (including generateRootIndex) based on scanTestsuite - works. but index.htm has a lock on it?  (investigation)
+# * multi-TS Execution sequentially or concurrently
+# * global $index 
+# * handle unexpected reboot scenario
+
 ############# todo: MarkTC related Actions #########
-# * mark by time
-# * mark with comments (mouse over comments)
+# * mark by delta time (every day at 0:00?) 
+# * mark with comments (mouse over comments)				-done 12/26/2012
 # * history mark link to logs/passfail
 # * mark non-executed TCs
 
@@ -4247,6 +4289,7 @@ sub call_index { 		my $return ; my $recordCtr=1;
 # The original c:\_TAF\... is treated as the test suites
 # Q: does the c:\_TAF\_TAF is necessary created? (It won't hurt for now)
 #############################################################
+
 ##################### Research Topic1: TAF_Team function   ############################
 # * Web Service architecture / CGI / RPC / RubyOnRail
 # * Browser independency 
@@ -4260,7 +4303,7 @@ sub call_index { 		my $return ; my $recordCtr=1;
 # ** Merge test suite from multi-machine
 # ** Move TS from one dir to different dir and regenerate the index*.*
 # 0. Move the TS to c:\_MachineName\....
-# 1. generateAyAnvilTestsuite.pl		-done
+# 1. generateAyAnvilTestsuite.pl					-done
 # 2. Copy c:\_TAF\* to new server
 # 3. taf testsuite=...;list
 # 4. Need to copy the AUT to new server

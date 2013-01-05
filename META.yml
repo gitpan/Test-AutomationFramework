@@ -23,5 +23,6 @@ requires:
   File::Copy::Recursive: 0.38
   File::Path: 2.0801
   Getopt::Long: 2.38
+  Regexp::Assemble: 0.35
   Test::More: 0.96
-version: v0.058.26
+version: v0.058.28

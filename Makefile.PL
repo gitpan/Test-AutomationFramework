@@ -13,6 +13,7 @@ WriteMakefile(
       "Getopt::Long"=> 2.38,
       "File::Copy"=> 2.18,
       "File::Copy::Recursive"=> 0.38,
+      "Regexp::Assemble"=> 0.35,
     }, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Test/AutomationFramework.pm', # retrieve abstract from module
