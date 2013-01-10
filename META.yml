@@ -25,4 +25,4 @@ requires:
   Getopt::Long: 2.38
   Regexp::Assemble: 0.35
   Test::More: 0.96
-version: v0.058.28
+version: v0.058.29
