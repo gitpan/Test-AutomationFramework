@@ -29,7 +29,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.33';   	
+our $VERSION = '0.058.36';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty;my %tafProperty; my %tafPropertyRev; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0; my %recordTags=();
@@ -194,9 +194,11 @@ sub recursiveSearchtcMain() {
 				if ($rst =~ /\n/) {
 					#### uncomment for debug   print "$File_Find_name\t$propertyOp_=\n$rst\n";
  					&appendtoFile_	($SvrDrive.'\\'.$SvrProjName.'\\'."_$propertyOp_.txt","$File_Find_name\t$propertyOp_=\n$rst\n")				;
+					print $SvrDrive.'/'.$SvrProjName.": $propertyOp_ = $rst"				;
 				} else {
 					#### uncomment for debug   print "$File_Find_name\t$propertyOp_=$rst\n";
  					&appendtoFile_	($SvrDrive.'\\'.$SvrProjName.'\\'."_$propertyOp_.txt","$File_Find_name\t$propertyOp_=$rst\n")				;
+					print $SvrDrive.'/'.$SvrProjName.": $propertyOp_ = $rst"				;
 				}
 			} else {
 				print "[TS/TC=$File::Find::name]  propertyOp=$propertyOp    _doit_\n"; # property Operation (print it)
@@ -308,6 +310,7 @@ sub copyTS        { shift; print "copy $tsFrom -> $tsTo\n";
 ############
 #
 
+sub generatePropertyTestsuite {goto &generateTestsuiteByDesc}
 sub generateTestsuiteBasedOnProperty{
 $SvrProjName =~ s/\\/\//g;
 &tcMain_1(); 
@@ -1628,6 +1631,7 @@ sub processTCs{
 		&appendtoFile($commandLogName,"$c/$_TAF/$taf ");
 	foreach my $each (@_) {
 		#### uncomment for debugging   print " cmd> $each\n";
+		print " cmd> $each\n";
 		&appendtoFile($commandLogName,$each.";");
 		if ($each !~ /=/) {
 			$isBatchProcessing = 0;
@@ -1711,7 +1715,7 @@ sub processTC {
 		    #if ($makeMark =~ /y/i) {$rst = &markTC_($tcname);}
 		    if ($NofExecutionCtr== 1 ) {$rst = &markTC_($tcname);}
 		    $rst = &execTC_($tcname);
-		    $rst = &mapTC($tcname);
+		    my $rst1 = &mapTC($tcname);
             } elsif ( $tcOP =~ /^\s*mark\b/i ) {
 		    $rst = &markTC_($tcname);
             } elsif ( $tcOP =~ /^\s*execAll/i ) {
@@ -1739,7 +1743,7 @@ sub processTC {
 	    } elsif ( $tcOP =~ /^\s*list|get\b/i ) {
 		    #$rst = &getProperties(&getTCName($tcname) , 'tcRunResult', 'latest'); # return latest include dump TC
 		    $rst = &getProperties(&getTCName($tcname) , 'tcRunResult', 'last');	   # return last valid TC result
-		    $rst = &mapTC($tcname);
+		    my $rst1 = &mapTC($tcname);
             } elsif ( $tcOP =~ /^\s*delete/i ) {
 		    $tcOP =~ s/^\s*delete\s*=//g;
 		    $tcOP =~ s/\s*$//g;
@@ -1766,7 +1770,8 @@ sub recursiveSearchListAll() {
 }
 
 sub createTS {		# Create Testsuite for Testbed 
-	my $tsName = "_testsuite_"; $tsName = shift if @_;
+	# my $tsName = "_testsuite_"; $tsName = shift if @_;
+	my $tsName = $SvrProjName; $tsName = shift if @_;
 	####### here if ($SvrProjName ne "_testsuite_") { $tsName = $SvrProjName; } # for backwards compatibility
 	$SvrProjName = $tsName;
 	if ($SvrProjName =~ s/_powershell_//i)  { 
@@ -2206,9 +2211,17 @@ sub processProperty {
 	shift; my $tcname = shift; my $propertyOP = shift; my $rst=""; my $prMsg=0;
 	#### PropertyOp String Translation
 	$propertyOP =~ s/^\s*propertyOp\s*=//g; $propertyOP =~ s/^\s*po\s*=//g; $propertyOP =~ s/_doit_//g;
+	if ($propertyOP =~ /^\s*_?modify_(.+)_(as|eq)_(.+)/) { $propertyOP = "add_eq_$1_column_$3"; }
 	if ($propertyOP =~ /^\s*_?set_(.+)_(as|eq)_(.+)/) { $propertyOP = "add_eq_$1_column_$3"; }
 	elsif ($propertyOP =~ /^\s*_?get_history(.+)/)  { $propertyOP = "get_history$1"; }
 	elsif ($propertyOP =~ /^\s*_?list_history(.+)/) { $propertyOP = "get_history$1"; }
+
+	elsif ($propertyOP =~ /^\s*_?get_latest(.+)/)  { $propertyOP = "get_latest$1"; }
+	elsif ($propertyOP =~ /^\s*_?list_latest(.+)/) { $propertyOP = "get_latest$1"; }
+
+	elsif ($propertyOP =~ /^\s*_?get_last(.+)/)  { $propertyOP = "get_last$1"; }
+	elsif ($propertyOP =~ /^\s*_?list_last(.+)/) { $propertyOP = "get_last$1"; }
+
 	elsif ($propertyOP =~ /^\s*_?get_(.+)/) { $propertyOP = "get_$1"; }
 	elsif ($propertyOP =~ /^\s*_?list_(.+)/) { $propertyOP = "get_$1"; }
 	#### PropertyOp String Translation
@@ -2230,22 +2243,32 @@ sub processProperty {
 		$propertyOP =~ s/^\s*get_history_+\s*//g; $propertyOP =~ s/^\s*list_history_+\s*//g;
 		$rst = &getProperties(&getTCName($tcname), $propertyOP, "history" );
  	}
+        elsif ( $propertyOP =~ /^\s*get_latest|list_latest/i ) {
+		$propertyOP =~ s/^\s*get_latest_+\s*//g; $propertyOP =~ s/^\s*list_latest_+\s*//g;
+		$rst = &getProperties(&getTCName($tcname), $propertyOP, "latest" );
+ 	}
+        elsif ( $propertyOP =~ /^\s*get_last|list_last/i ) {
+		$propertyOP =~ s/^\s*get_last_+\s*//g; $propertyOP =~ s/^\s*list_last_+\s*//g;
+		$rst = &getProperties(&getTCName($tcname), $propertyOP, "last" );
+ 	}
         elsif ( $propertyOP =~ /^\s*get|list/i ) {
 		    $propertyOP =~ s/^\s*get_\s*//g; $propertyOP =~ s/^\s*list_\s*//g;
 		if ($propertyOP =~ /;/ ) {
 		    @_ = split /;/, $propertyOP ;
 		    $rst = &getProperties(&getTCName($tcname), $_[0], $_[1]);
 	    	} else {
-			    $rst = &getProperties(&getTCName($tcname), $propertyOP, "value" );
+		    $rst = &getProperties(&getTCName($tcname), $propertyOP, "value" );
 		}
        }
        elsif ( $propertyOP =~ /^\s*create/i ) {
         	$rst = &createPropertyTemplate($tcname);
        }
        elsif ( $propertyOP =~ /^\s*match|filter/i ) {
-		    $propertyOP =~ s/^\s*match\s*=//g;
-		    $propertyOP =~ /\s*(\S+)\s*[:|;]\s*(\S+)\s*/; 
-        	    $rst = &matchProperty($1, $2, $tcname);
+		if ($propertyOP =~ s/^\s*match\s*_//g) {
+		    $propertyOP =~ /\s*(\S+)\s*_(as|eq)_\s*(\S+)\s*/; 
+		    # $propertyOP =~ /\s*(\S+)\s*[:|;]\s*(\S+)\s*/; 
+        	    $rst = &matchProperty($1, $3, $tcname);
+	    }
        } else {
 	    	    $rst = sprintf "ProcessProperty (no match OP) %40s %20s", $tcname, $propertyOP;
        }
@@ -2266,17 +2289,17 @@ sub matchProperty { # &matchProperty("QAOwner","ywang", "TC_tc1");
 	$propertyPattern= shift if (@_);
 	$tcname = shift if (@_);
 
-	 if (&getProperties(&getTCName($tcname)) =~ /info:There is no/ ) {
+	 if (&getProperties(&getTCName($tcname), "" ) =~ /info:There is no/ ) {
 		 return "False";
 	 }
 
-	foreach my $each (split /\n/,  &getProperties(&getTCName($tcname))) {
-		$each =~ /^\s*(\w+)\s*=\s*(\w+)\s*$/;
+	foreach my $each (split /\n/,  &getProperties(&getTCName($tcname), "", "_all_")) {
+		$each =~ /^\s*(\w+)\s+(\w+)\s*$/;
 		$array {$1}  = $2;
 	}
 	foreach my $each (sort keys %array) {
 		if (($array{$each} =~ /$propertyPattern/) && ( $each =~ /$propertyName/)) { 
-			 return "True"; }
+			 return "True\n$each:$array{$each}"; }
 	}
 	return 'False';
 }
@@ -2293,10 +2316,10 @@ sub getProperties() { 	# get TC Property Names	(TH:TC Managements)
 		my $propertyOp		; $propertyOp  		= shift if @_ ;
 		my $returnType= 'latest'; $returnType 		= shift if @_ ;
 
-    		$propertyOp =~ s/^\s*add\s*=\s*//ig;
-		$propertyOp =~ s/^\s*_eq_\s*//g;
-		$propertyOp =~ s/\s*_eq_\s*/=/g;
-		$propertyOp =~ s/_column_/:/g;
+    		if ($propertyOp =~ s/^\s*add\s*=\s*//ig) {;}
+		elsif ($propertyOp =~ s/^\s*_eq_\s*//g) {;}
+		elsif ($propertyOp =~ s/\s*_eq_\s*/=/g) {;}
+		elsif ($propertyOp =~ s/_column_/:/g) {;}
 
 		if ($propertyOp =~ /_all_/) { $returnType = "_all_"; $propertyOp =~ s/_all_//g; }
 
@@ -2356,13 +2379,15 @@ sub getProperties() { 	# get TC Property Names	(TH:TC Managements)
 sub modifyProperty() { 	# modify TC Property (TH:TC Managements)
     my $tcname       = $_[0];
     my $propertyName = $_[1];
-    $propertyName =~ s/^\s*modify\s*=\s*//g;
-    $propertyName =~ /(\w+)\s*:\s*(\w+)\s*/;
-    $propertyName = $1;
-    my $propertyValue = $2;
+    my $propertyValue       ; 
+    if ($propertyName =~ s/^\s*modify\s*_\s*//g) {
+    $propertyName =~ /(\w+)\s*_as_\s*(\w+)\s*/;
+    $propertyName = $1; $propertyValue = $2;
+    }
     my $cmdStr        = "delete=$propertyName";
     &deleteProperty( $tcname, $cmdStr );
-    $cmdStr = "add=$propertyName:$propertyValue";
+    # $cmdStr = "add=$propertyName:$propertyValue";
+    $cmdStr = "add_${propertyName}_column_${propertyValue}"; # todo
     &addProperty( $tcname, $cmdStr );
     return "$propertyName is modified to $propertyValue for $tcname";
 }
@@ -2378,8 +2403,8 @@ sub deleteProperty() {	# delete TC Property	(TH:TC Managements)
     my $fout  = $fname; $fout =~ s/\.txt/_Dumpster\.txt/;
 
     my $propertyName = $_[1]; 
-    if ($propertyName !~ /\s*del\S*\s*=\s*/) { return "Warning: wrong format  -del=prop1;pr2Screen";}
-    $propertyName =~ s/^\s*del\S*\s*=\s*//g; $propertyName =~ s/:\s*\S*//;
+    if ($propertyName !~ /\s*del\S*\s*_\s*/) { return "Warning: wrong format  -del=prop1;pr2Screen";} else {
+    $propertyName =~ s/^\s*del\S*\s*_\s*//g; $propertyName =~ s/:\s*\S*//; }
     my %array ;
     open Fin, "$fname"; @_ = <Fin>; close Fin;
 
@@ -2449,8 +2474,8 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
 		$propValue =~ s/_column_/:/g;
         	printf Fout "%20s|%10s|%s\n",$propName, $propValue,$propComment;
 	} else {
-		# $propertyName =~ /^\s*(\S+)_column_(\S+)\s*/; 
-		$propertyName =~ /^\s*(\S+):(\S+)\s*/; 
+		$propertyName =~ /^\s*(\S+)_column_(\S+)\s*/; 
+		# $propertyName =~ /^\s*(\S+):(\S+)\s*/; 
 		my $propName = $1;
 		my $propValue = $2;
 		if ($propName && $propValue) {
@@ -2460,6 +2485,7 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
 		$propValue =~ s/___/ /g;
 		$propName =~ s/^\s*add\s*=//g;
 		$propName =~ s/_space_/ /g;
+        	printf "%20s|%10s%s\n",$propName, $propValue,$timeStr;
         	printf Fout "%20s|%10s%s\n",$propName, $propValue,$timeStr;
 		}
 	}
@@ -3110,7 +3136,7 @@ EOF_
 
 }
 
-
+sub generateTAFTestsuite {goto &generateTestsuite}
 sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnvil.pl 
 	my $cmd = $SvrProjName ;  $cmd = shift if @_;
 	if ($cmd !~ /:/) { $cmd = $c.'/'.$_TAF.'/'.$cmd; }
@@ -3702,21 +3728,42 @@ sub genDriver {
 
 my $str =<<EOF;
 
-REM create test_suite (_test_suite?_)/_test_case?_  under c:\\_TAF
-$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0001/overwrite,sleep=20
-$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0002/overwrite,sleep=20
-$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0003/overwrite,sleep=40
-$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0004/overwrite,sleep=30
-$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0005/overwrite,sleep=20
-$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0006/overwrite,sleep=20
+REM ------------- Create TC/TS under c:\\$_TAF -----------------------------------
+REM * Create Functional test case, which returns Pass with different execution time. 
+REM * Create Functional test case, which returns Fail with different execution time. 
+REM * Create Performance test case, which returns number of seconds
+REM * Create Functional test case, with logs and links in the logs (_tcLogAppend.txt)
+REM * Create Functional test case, with expected failure (expF)
+REM * Test case execution  testcase=string : (testType=tc or ts: what does it mean?) 
+REM * Test case execution  testcase=regExp : (testType=tc or ts: what does it mean?) 
+REM * Test suite execution  testsuite=string : (testType=tc or ts: what does it mean?) 
+REM * Test suite execution  testsuite=regExp : (testType=tc or ts: what does it mean?) 
+REM * Test case status : moving ">"
+REM * Test case 24/7 execution
+REM * Test suite 24/7 execution
+REM * Test case "stop" 
+REM * Test suite "stop"
+REM * Test suite title tsProperty.txt
+REM * Test case  title tcProperty.txt
+REM create test_suite (_test_suite?_)/_test_case?_  under c:\\$_TAF
+REM * Modify 
+REM * Delete TC/TS
+REM * Update TS/TC Status
+REM ------------- Create TC/TS under $c\\$_TAF -----------------------------------
+
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;create=testcase0001/overwrite,sleep=1
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;create=testcase0002/overwrite,sleep=1
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;create=testcase0003/overwrite,sleep=1
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;create=testcase0004/overwrite,sleep=1
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;create=testcase0005/overwrite,sleep=1
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;create=testcase0006/overwrite,sleep=1
+$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0001/overwrite,sleep=20
+$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0002/overwrite,sleep=20
+$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0003/overwrite,sleep=40
+$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0004/overwrite,sleep=30
+$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0005/overwrite,sleep=20
+$c\\$_TAF\\taf.pl testsuite=_testsuite2_;create=testcase0006/overwrite,sleep=20
 $c\\$_TAF\\taf.pl testsuite=_testsuite3_;create=testcase0001/overwrite,sleep=2
-
 REM create performance test 
 $c\\$_TAF\\taf.pl testsuite=_testsuite3_;create=testcase0002/overwrite,perf,sleep=3
 REM create Failed Functional test 
@@ -3730,6 +3777,13 @@ $c\\$_TAF\\taf.pl testsuite=_testsuite3_;create=testcase0008/overwrite,pass,genL
 $c\\$_TAF\\taf.pl testsuite=_testsuite3_;create=testcase0009/overwrite,expectedFail,genLog,sleep=1
 $c\\$_TAF\\taf.pl testsuite=_testsuite3_;create=testcase0010/overwrite,expF,genLog,sleep=1
 
+REM create customrized TAF test cases for property operation test (TC contents are hardcoded in TAF)
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0001/overwrite,sleep=1,customTC:taftestcase1:customTC
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0002/overwrite,sleep=1,customTC:taftestcase2:customTC
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0003/overwrite,sleep=1,customTC:taftestcase3:customTC
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0004/overwrite,sleep=1,customTC:taftestcase4:customTC
+$c\\$_TAF\\taf.pl testsuit=_testsuite4_;exec
+
 REM exec all test_suite (testsuite!= Regexp; testcase=RegExp)
 
 $c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;exec
@@ -3738,16 +3792,6 @@ $c\\$_TAF\\taf.pl testsuite=_testsuite1_;testType=tc;testcase=testcase.1*;exec
 
 $c\\$_TAF\\taf.pl testsuite=_testsuite2_;testType=tc;exec
 $c\\$_TAF\\taf.pl testsuite=_testsuite3_;testType=tc;exec
-
-
-
-REM create customrized TAF test cases for property operation test (TC contents are hardcoded in TAF)
-$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0001/overwrite,sleep=1,customTC:taftestcase1:customTC
-$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0002/overwrite,sleep=1,customTC:taftestcase2:customTC
-$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0003/overwrite,sleep=1,customTC:taftestcase3:customTC
-$c\\$_TAF\\taf.pl testsuit=_testsuite4_;create=testcase0004/overwrite,sleep=1,customTC:taftestcase4:customTC
-$c\\$_TAF\\taf.pl testsuit=_testsuite4_;exec
-
 
 REM test execution status (1. moving symbol = test-in-prog 2. Current execution status = getWeb_ 3. delete TS
 $c\\$_TAF\\taf.pl testsuit=_testsuite1_;testType=tc;list
@@ -3758,159 +3802,223 @@ $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=_testcase1_/2
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=_testcase2_/1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=_testcase3_/3
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;getWeb_=_testcase1_
-$c\\$_TAF\\taf.pl testType=tc;delete=$c/$_TAF/_test_suit1_
+$c\\$_TAF\\taf.pl testType=tc;delete=c:/_TAF/_test_suit1_
+REM TS Property update 
 REM *Verification* _test_suit1_ is removed from disk and webUI
+REM
+REM ------------- Create TC/TS under c:\\$_TAF -----------------------------------
+   
 
-REM create test suite under c:\\_TAF	(create test hook = index.pl)
-$c\\$_TAF\\taf.pl -processTSs create=$c/$_TAF/_testsuiteTestBed/_testsuite1_/_TS1
-$c\\$_TAF\\taf.pl -processTSs create=$c/$_TAF/_testsuiteTestBed/_testsuite1_/_TS2
-$c\\$_TAF\\taf.pl -processTSs create=$c/$_TAF/_testsuiteTestBed/_testsuite2_/_TS1
-$c\\$_TAF\\taf.pl -processTSs create=$c/$_TAF/_testsuiteTestBed/_testsuite2_/_TS2
-$c\\$_TAF\\taf.pl -processTSs create=$c/$_TAF/_testsuiteTestBed/_testsuite3_
-$c\\$_TAF\\taf.pl -processTSs create=$c/$_TAF/_testsuiteTestBed/_testsuite4_
-
-REM *Verification* TC $c/$_TAF/_testsuiteTestBed/_testsuite?_ should be created
-
+REM ------------- Create TC/TS outside c:_testsuite5_ .... ---------------------
 REM generate test suite from TS Hook (index.pl) - Will be batched by scanTestsuite
-$c\\$_TAF\\taf.pl testsuite=$c/$_TAF/_testsuiteTestBed/_testsuite1_/_TS1;generateTestsuite 
-$c\\$_TAF\\taf.pl testsuite=$c/$_TAF/_testsuiteTestBed/_testsuite2_/_TS1;generateTestsuite 
-rem *Absolete* $c\\$_TAF\\taf.pl workingDir=c:/_TAF/_testsuiteTestBed/_testsuite1_/_TS1;generateTestsuite 
-rem *Absolete* $c\\$_TAF\\taf.pl workingDir=c:/_TAF/_testsuiteTestBed/_testsuite2_/_TS1;generateTestsuite 
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1;createTS
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1;createTS
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1;createTS
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1;createTS
 
-REM *Verification* TC_TAF $c/$_TAF/$_TAF/_testsuiteTestBed/_testsuite?_ should be created
-$c\\$_TAF\\taf.pl testsuite=$_TAF/_testsuiteTestBed/_testsuite1_/_TS1;exec
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1;generateTAFTestsuite 
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1;generateTAFTestsuite 
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1;generateTAFTestsuite 
+$c\\$_TAF\\taf.pl testsuite=c:/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1;generateTAFTestsuite 
 
+REM *Verification* TC_TAF c:/_TAF/_TAF/_testsuiteTestBed/_testsuite?_ should be created
+$c\\$_TAF\\taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1;exec
+$c\\$_TAF\\taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1;exec
+$c\\$_TAF\\taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1;exec
+$c\\$_TAF\\taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1;exec
 
-REM create [Powershell|perl] test suite outside c:\\_TAF (c:\\_CRB...) 
-
-$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl
-REM *Verification* TC c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_[ps1|pl]_ are created
-
-REM *tobe verified* A different way to create TS. $c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
-REM *absolete* Testbed for Powershell Testsuite scan conversion
-REM *absolete* $c\\$_TAF\\generatePyAnvilTestsuite.pl -buildpath c:/_CRB_/AppBuildpath -genTAF y		REM integrated by c:\\_TAF\\index.pl
-
-REM generate tcDesc-Tag (_smoketest_, _regression_) test suite 
-$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_pl;generateTestsuiteBasedOnProperty
-$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_pl;generateTestsuiteBasedOnProperty
-$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_pl;generateTestsuiteBasedOnProperty
-
-REM *Verification* TC_TAF c:\\_TAF\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_[full|testsuite_pl|regressiontest]_\\_smoketest_ are created
-
-REM generate test suites by scanning testsuite directory
-rem tobe tested $c\\$_TAF\\taf.pl testsuite=c:\\_CRB__doit_\\AppBuildpath\\_automated_testsuites_\\_testsuite_pl;scanTestsuites 
-REM *Verification* TC c:\\_TAF\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_[pl|ps1]_\\_[smoketest|regression]_ are created
-REM ################# test powershell index.ps1 (make sure the ts ends with _powershell_, which indicate a powershell testsuite
-$c\\$_TAF\\taf.pl -processTSs create=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_
-
-$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generateTestsuiteBasedOnProperty
-$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generateTestsuiteBasedOnProperty
-$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generateTestsuiteBasedOnProperty
-
-$c\\$_TAF\\taf.pl testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_\\_full;generateTestsuite
-$c\\$_TAF\\taf.pl testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_\\_smoketest_;generateTestsuite
-$c\\$_TAF\\taf.pl testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_\\_regressiontest_;;generateTestsuite
-
-$c\\$_TAF\\taf.pl testsuite=c:\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generateTestsuite
-
-REM *absolete* $c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;tsFilterDefault=c:\\_CRB_\\AppBuildpath;generateTestsuiteByDesc
-REM *absolete* $c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;tsFilterDefault=c:\\_CRB_\\AppBuildpath;generateTestsuiteByDesc
-REM *absolete* $c\\$_TAF\\taf.pl tsFilter=_CRB__doit_;scanTestsuites 
-REM *absolete* $c\\$_TAF\\taf.pl testsuite=_CRB__doit_;scanTestsuites 
-
-rem *absolete* $c\\$_TAF\\taf.pl workingDir=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl;generateTestsuite 
-rem *absolete* $c\\$_TAF\\taf.pl workingDir=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_smoketest_;generateTestsuite 
-rem *absolete* $c\\$_TAF\\taf.pl workingDir=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_regressiontest_;generateTestsuite 
+REM ------------- Create TC/TS outside c:_testsuite5_ .... ---------------------
 
 
-REM process perl test suite (This helps to debug duplicated records in webUI)
-$c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl;generateTestsuite 
-$c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_smoketest_;generateTestsuite 
-$c\\$_TAF\\taf.pl testsuite=c:/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_regressiontest_;generateTestsuite 
-$c\\$_TAF\\taf.pl testsuite=c:/_CRB__doit_;scanTestsuites 
-REM *Verification* TC c:\\_TAF\\_CRB_\\AppBuildpath\\_automated_testsuites_\\_testsuite_[pl|ps1]_\\_[smoketest|regression]_ are created
+REM ------------- Create Perl-Testsuite Hook and its Test suites /w Tag-based sub-Testsuites (_smoketest_, _regression_ )
+
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl;createTS
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl;createTS
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl;createTS
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl;createTS
+
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl;generateTAFTestsuite
+
+REM generate tcDesc-Tag (_smoketest_, _regression_) test suite. There is no TAG in the hook. (The following will break TAF)
+Rem $c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl;generatePropertyTestsuite
+Rem $c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl;generatePropertyTestsuite
+Rem $c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl;generatePropertyTestsuite
+
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl;generatePropertyTestsuite
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites2_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites2_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites2_\\_testsuite_pl;generatePropertyTestsuite
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites3_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites3_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites3_\\_testsuite_pl;generatePropertyTestsuite
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites4_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites4_\\_testsuite_pl;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites4_\\_testsuite_pl;generatePropertyTestsuite
+
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl\\_full_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl\\_smoketest_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites1_\\_testsuite_pl\\_regressiontest_;generateTAFTestsuite
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites2_\\_testsuite_pl\\_full_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites2_\\_testsuite_pl\\_smoketest_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites2_\\_testsuite_pl\\_regressiontest_;generateTAFTestsuite
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites3_\\_testsuite_pl\\_full_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites3_\\_testsuite_pl\\_smoketest_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites3_\\_testsuite_pl\\_regressiontest_;generateTAFTestsuite
+
+$c\\$_TAF\\taf.pl tcPropertyName=_full_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites4_\\_testsuite_pl\\_full_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_smoketest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites4_\\_testsuite_pl\\_smoketest_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl tcPropertyName=_regressiontest_;testsuite=c:\\_perlTestsuite_\\AppBuildpath\\_automated_testsuites4_\\_testsuite_pl\\_regressiontest_;generateTAFTestsuite
+
+
+REM ------------- Create Perl-Testsuite Hook and its Test suites /w Tag-based sub-Testsuites (_smoketest_, _regression_ )
+REM                  (make sure the ts ends with _powershell_, which indicate a powershell testsuite)
+
+
+REM ------------- Create Powershell-Testsuite Hook and its Test suites    -  Generate Tag-based sub-Testsuites -------------
+$c\\$_TAF\\taf.pl testsuite=c:/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1__powershell_;createTS
+
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generatePropertyTestsuite
+
+$c\\$_TAF\\taf.pl testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_\\_full_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_\\_smoketest_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_\\_regressiontest_;generateTAFTestsuite
+$c\\$_TAF\\taf.pl testsuite=c:\\_powershellTestsuite_\\AppBuildpath\\_automated_testsuites_\\_testsuite_ps1_;generateTAFTestsuite		REM combine all the property testsuites
+REM ------------- Create Powershell-Testsuite Hook and its Test suites    -  Generate Tag-based sub-Testsuites -------------
 
 REM Demo for generating daily excel report 
 
-rem *Integrated* $c\\$_TAF\\taf.pl testsuite=_testsuite1_;AutomationtsName=GenerateExcelReportDemo;resetTSFileName=_ts_Desc.txt;resetTSFile;propertyOp=list_tcDesc 
-rem *Integrated* $c\\$_TAF\\taf.pl testsuite=_testsuite1_;AutomationtsName=GenerateExcelReportDemo;resetTSFileName=_list_history_tcRunResult.txt;resetTSFile;propertyOp=list_history_tcRunResult
-rem *Integrated* $c\\$_TAF\\taf.pl testsuite=_testsuite1_;AutomationtsName=GenerateExcelReportDemo;generateExcelReport
-
-
+REM ------------- Scabiality Test: multi-testsuites and testing scanTestsuite  --------------------------
+REM
 REM helloworld-testbed powershell-Hook (property = _full_, _smoketest_, _regressiontest_)
-$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1__powershell_
-$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2__powershell_
-$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3__powershell_
-$c\\_TAF\\taf.pl -processTSs create=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4__powershell_
+$c\\$_TAF\\taf.pl testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite1__powershell_;createTS
+$c\\$_TAF\\taf.pl testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite2__powershell_;createTS
+$c\\$_TAF\\taf.pl testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite3__powershell_;createTS
+$c\\$_TAF\\taf.pl testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite4__powershell_;createTS
 
-REM generate testsuite (generateTestsuiteByDesc) by tcDesc-Tags with TSHookName (index.ps1) ->TSHookNameGenerated(index.pl) 
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuiteByDesc
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite1_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite1_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite1_;generatePropertyTestsuite
 
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2_;generateTestsuiteByDesc
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite2_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite2_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite2_;generatePropertyTestsuite
 
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuie=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3_;generateTestsuiteByDesc
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite3_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite3_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite3_;generatePropertyTestsuite
 
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4_;generateTestsuiteByDesc
-$c\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4_;generateTestsuiteByDesc
-
-
-REM scanTestsuites from testsuite directory 
-$c\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1__doit_;scanTestsuites
-$c\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite2__doit_;scanTestsuites
-$c\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite3__doit_;scanTestsuites
-$c\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite4__doit_;scanTestsuites
-REM The 4 cmds can be done by one cmd ($c\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT;scanTestsuites)
-
-$c\\$_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\Automation_testsuite1_;generateTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite4_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_smoketest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite4_;generatePropertyTestsuite
+$c\\$_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_regressiontest_;testsuite=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite4_;generatePropertyTestsuite
 
 
-REM Tobe Debugged  testcaseNode=testcase will enforce only one level of scan is achieved (no different levels of scan combined)
+REM scanTestsuites from testsuite directory  (recursive execution should only be executed once)
+$c\\$_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite1__doit_;scanTestsuites
+$c\\$_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite2__doit_;scanTestsuites
+$c\\$_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite3__doit_;scanTestsuites
+$c\\$_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\BAT\\Automation_testsuite4__doit_;scanTestsuites
+
+REM ------------- Scabiality Test: multi-testsuites and testing scanTestsuite  --------------------------
+
+
+REM Solution: testcaseNode=testcase will enforce only one level of scan is achieved (no different levels of scan combined)
 
 REM update testbed' s _thProperties.txt[s]. This should be a smart-build function. Run this before running taf.pl list
 $c\\$_TAF\\taf.pl printTestBedProperties;generateRootIndex 
 
 
+$c\\$_TAF\\taf.pl testsuit=_testsuite1_;testType=tc;list
+$c\\$_TAF\\taf.pl testsuit=_testsuite2_;testType=tc;list
+$c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;list
 $c\\$_TAF\\taf.pl testsuit=_testsuite4_;testType=tc;list
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=testcase0001/2
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=testcase0002/1
 $c\\$_TAF\\taf.pl testsuit=_testsuite3_;testType=tc;updateWeb_=testcase0003/3
 
-rem todo: property operation and property filter
 
 rem Mark TS with comments
 rem taf.pl testsuite=_testsuite1_;tcComment2=abcd;mark 
 \@start "" /b "C:\\Program Files\\Internet Explorer\\iexplore.exe" "C:\\$_TAF\\_testsuite3_\\index.htm"
 
-REM Job-specific (LBP) Check if it is integrated in [c|d|e]:\\_TAF\\index.pl
-rem c:\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation_doit_;ps1_args=;ps1_args=-buildpath___c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;scanTestsuite
-rem c:\\_TAF\\taf.pl TSHookName=index.ps1;TSHookNameGenerated=index.pl;tcPropertyName=_full_;tsFilterDefault=C:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;ps1_args=-buildpath___c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;generateTestsuiteByDesc
-rem c:\\_TAF\\taf.pl testsuite=c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation_doit_;ps1_args=-buildpath___c:\\Autobat\\Bat\\QA_Tests\\BATtests\\MVTests\\BAT\\LBP_Automation;scanTestsuites
-
+# mark3
+rem todo: --------------------- property operation and property filter
+rem add/set, createTemplate, del, modify, match/filter, get/list (values,_all_, history, latest, last, value, filters), 
+REM Property Operation: add a property
+REM Property Operation: set/modify a property
+REM Property Operation: get/list a property
+REM Property Operation: print TC properties
+REM Property Operation: propertyFilter 
+REM 
 REM	copy testsuites			taf.pl tsFrom=e.txt;tsTo=ee.txt;copyTS   
 
 REM Test the tcFilter functions
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;printTCFilters
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;propertyOp=set_propverty1_as_value1_doit_
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase2;propertyOp=set_property1_as_value2_doit_
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase2;printTCFilters
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property1_eq_value1a_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property1_eq_value1b_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property1_eq_value1c_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property1_eq_value1d_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property1_eq_value1e_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property1_eq_value1f_doit_
 
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;printTcFilters
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;propertyOP=get_property1
-rem *Technology Reserve* $c\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase2 propertyOP=get_property1
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0002;propertyOp=set_property1_eq_value1a_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0002;propertyOp=set_property1_eq_value1b_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0002;propertyOp=set_property1_eq_value1c_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0002;propertyOp=set_property1_eq_value1d_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0002;propertyOp=set_property1_eq_value1e_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0002;propertyOp=set_property1_eq_value1f_doit_
+
+REM get TC properties 
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=get_property1
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=get_history_property1
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=get_last_property1
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=get_latest_property1
+
+REM del TC properties (remove all the property-values)
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=set_property2_eq_value2a_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=del_property2_doit_
+
+REM Modify TC properties (same as add properties - append to thProperty.txt)
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=modify_property3_eq_value3f_doit_
+
+REM print TS/TC tcFilters 
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;printTCFilters		
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;printTCFilters
+
+REM property match (might need regExp in the future)
+
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=match_property2_as_value1h_doit_
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase0001;propertyOp=match_property1_as_value1h_doit_
+
+c:\\$_TAF\\taf.pl testsuite=_testsuite3_;printTCFilters
+rem *Technology Reserve* c:\\$_TAF\\taf.pl testsuite=_testsuite3_;propertyOp=set_propverty1_as_value1_doit_
+rem *Technology Reserve* c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase2;propertyOp=set_property1_as_value2_doit_
+rem *Technology Reserve* c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase2;printTCFilters
+
+rem *Technology Reserve* c:\\$_TAF\\taf.pl testsuite=_testsuite3_;printTcFilters
+rem *Technology Reserve* c:\\$_TAF\\taf.pl testsuite=_testsuite3_;propertyOp=get_property1
+rem *Technology Reserve* c:\\$_TAF\\taf.pl testsuite=_testsuite3_;testcase=testcase2 propertyOp=get_property1
 
 REM Old memories 
-rem taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:$c/tmp/purge.pl_space_1:customTC'
-rem taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,pyAnvil,customTC:$c/tmp/indexPyAnvil.pl_space_1:customTC'
+rem taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,customTC:c:/tmp/purge.pl_space_1:customTC'
+rem taf.pl 'testsuit=_test_suit1_;create=_testcase1_/overwrite,pyAnvil,customTC:c:/tmp/indexPyAnvil.pl_space_1:customTC'
 
 EOF
-	open Fout, "> $c/$_TAF/taf.bat"; print Fout $str; close Fout; print " --> $c/$_TAF/taf.bat\n"; my $cmd = "$c/$_TAF/taf.bat"; 
+	open Fout, "> $c/$_TAF/taf.txt"; print Fout $str; close Fout; print " --> $c/$_TAF/taf.txt\n"; my $cmd = "$c/$_TAF/taf.txt"; 
+	open Fout, "> $c/$_TAF/taf.bat"; print Fout $str; close Fout; print " --> $c/$_TAF/taf.bat\n";    $cmd = "$c/$_TAF/taf.bat"; 
 	if ( &enterY("Execute $c\\taf.bat (y/n)? ") =~ /y/) {	system $cmd; }
 	}
 	1;
@@ -3922,9 +4030,30 @@ sub install 		{ &genDriver(); 1; }
 
 
 sub printTestBedProperties {
+
+	############ Generate taf Property file for _testsuite1_
+open Fout, ">$c/$_TAF/_testsuite1_/tsProperty.txt";
+my $str = <<EOF;
+There is no tsProperty.txt for c:\\_TAF\\_testsuite1_. This is as designed.
+EOF
+print Fout $str;
+close Fout; 
+	############ Generate taf Property file for _testsuite1_
+
+	############ Generate taf Property file for _testsuite2_
+open Fout, ">$c/$_TAF/_testsuite2_/tsProperty.txt";
+$str = <<EOF;
+There is no tsProperty.txt for c:\\_TAF\\_testsuite2_. This is as designed.
+EOF
+print Fout $str;
+close Fout; 
+	############ Generate taf Property file for _testsuite2_
+
+
+
 	############ Generate taf Property file for _testsuite3_
 open Fout, ">$c/$_TAF/_testsuite3_/tsProperty.txt";
-my $str = <<EOF;
+$str = <<EOF;
 web_ui_title: Test Automation Framework : web_ui_title
 $c/$_TAF/_testsuite3_/testcase0001| 1  Test case 1 description                            Manual edit please     
 $c/$_TAF/_testsuite3_/testcase0002| 2  Test case 2 Perform TC  for tsProperty.txt         Manual edit please     
@@ -3939,8 +4068,8 @@ $c/$_TAF/_testsuite3_/testcase0010| 10 Test case return expF               for .
 EOF
 print Fout $str;
 close Fout; 
-
 	############ Generate taf Property file for _testsuite3_
+	
 open Fout, ">$c/$_TAF/_testsuite4_/tsProperty.txt";
 $str = <<EOF;
 web_ui_title: Testcase/Testsuite Property Operation Test Suite : web_ui_title
@@ -3956,37 +4085,71 @@ close Fout;
 open Fout, ">$c/$_TAF/tsProperty.txt";
 print Fout<<EOF;
 web_ui_title: Test Automation Framework : web_ui_title
-$c/$_TAF/_testsuite1_|001  TAF Testbed 1 : Test Case Access: TC list, TC execution, TC Reporting /o TC Description
-$c/$_TAF/_testsuite2_|002  TAF Testbed 2 : Test Case Access: TC list, TC execution, TC Reporting /o TC Description - Multiple Test suites
-$c/$_TAF/_testsuite3_|003  TAF Testbed 3 : Test Case Access: Concurrency, Performance TCs, TC Logging, list/exec pass|failed|other test cases /w TC Description 
-$c/$_TAF/_testsuite4_|004  TAF Testbed 4 : Test case/suite property operations : add|get properties
-$c/$_TAF/_testsuite5_|005  TAF/pyAnvil/MV Integration
-$c/$_TAF/_testsuite6_|006  TAF MV TC Integration 
-$c/$_TAF/_TAF/_testsuiteTestBed/_testsuite1_/_TS1|005  TAF Testbed 5 : Multiple test suite coexistence
-$c/$_TAF/_TAF/_testsuiteTestBed/_testsuite2_/_TS1|006  TAF Testbed 6 : Multiple test suite coexistence
-$c/$_TAF/_TAF/_testsuiteTestBed/_testsuite1_/_TS2|005A TAF Testbed 5A: Multiple test suite coexistence
-$c/$_TAF/_TAF/_testsuiteTestBed/_testsuite2_/_TS2|006A TAF Testbed 6A: Multiple test suite coexistence
-$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl|007  TAF Testbed 7 : TC management based on TC-desc tags (all tags _smoketest_, _regressiontest_)
-$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_full_|008  TAF Testbed 8 : TC management based on TC-desc tags (_full_ Same as TAF Testbed 7)
-$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_regressiontest_|009  TAF Testbed 9 : TC management based on TC-desc tags (_regressiontest_)
-$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_pl/_smoketest_|010  TAF Testbed 10: TC management based on TC-desc tags (_smoketest_)
-$c/$_TAF/_CRB_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_|011  TAF Testbed 11: Language Independency: Handling Powershell test case 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_|012  TAF Testbed 12: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_/_full_|013  TAF Testbed 13: Test suite generation : all tests                        of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_/_regressiontest_|014  TAF Testbed 14: Test suite generation : regression tests                 of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite1_/_smoketest_|015  TAF Testbed 15: Test suite generation : smoke tests                      of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_|016  TAF Testbed 16: Test suite Tree structure: Test suite Node (in develop)  of testsuite2
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_/_full_|017  TAF Testbed 17: Test suite generation : all tests of testsuite2          of testsuite2
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_/_regressiontest_|018  TAF Testbed 18: Test suite generation : regression tests                 of testsuite2 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite2_/_smoketest_|019  TAF Testbed 19: Test suite generation : smoke tests of testsuite3        of testsuite3
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite3_|020  TAF Testbed 20: Test suite Tree structure: Test suite Node (in develop)  of testsuite3
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite3_/_full_|021  TAF Testbed 21: Test suite generation : all tests of testsuite3          of testsuite3
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite3_/_regressiontest_|022  TAF Testbed 22: Test suite generation : regression tests                 of testsuite3 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite3_/_smoketest_|023  TAF Testbed 23: Test suite generation : smoke tests of testsuite3        of testsuite3
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite4_|024  TAF Testbed 24: Test suite Tree structure: Test suite Node (in develop)  of testsuite4
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite4_/_full_|025  TAF Testbed 25: Test suite generation : all tests of testsuite4          of testsuite4
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite4_/_regressiontest_|026  TAF Testbed 26: Test suite generation : regression tests                 of testsuite4 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/MVTests/BAT/Automation_testsuite4_/_smoketest_|027  TAF Testbed 27: Test suite generation : smoke tests of testsuite4        of testsuite4
+$c/$_TAF/_testsuite1_|001  TAF Testbed 1 : Test Case  Management: TC list, TC execution, TC Reporting /o TC Description
+$c/$_TAF/_testsuite2_|002  TAF Testbed 2 : Test Case  Management: TC list, TC execution, TC Reporting /o TC Description 
+$c/$_TAF/_testsuite3_|003  TAF Testbed 3 : Test Case  Management: Concurrency, Performance TCs, TC Logging, TC Description 
+$c/$_TAF/_testsuite4_|004  TAF Testbed 4 : Test Case  Management: Property operations : add/get properties 
+
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1|007  TAF Testbed 7 : Test Suite Management: Multiple test suite coexistence (testsuite1)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1|008  TAF Testbed 8 : Test Suite Management: Multiple test suite coexistence (testsuite2)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1|009  TAF Testbed 9 : Test Suite Management: Multiple test suite coexistence (testsuite3)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1|010  TAF Testbed 10: Test Suite Management: Multiple test suite coexistence (testsuite4)
+
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl|011  TAF Testbed 11: ts1: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl|012  TAF Testbed 12: ts2: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl|013  TAF Testbed 13: ts3: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl|014  TAF Testbed 14: ts4: perl testsuite hook /o tags _smoketest_, _regressiontest_
+
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl|015  TAF Testbed 15: Test Suite Management: Perl Script Automation    Test Suite 1 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_|016  TAF Testbed 16: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_|017  TAF Testbed 17: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_|018  TAF Testbed 18: Test Suite Management:                       sub Test Suite   (_smoketest_)
+
+
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl|019  TAF Testbed 19: Test Suite Management: Perl Script Automation    Test Suite 2 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_|020  TAF Testbed 20: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_|021  TAF Testbed 21: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_|022  TAF Testbed 22: Test Suite Management:                       sub Test Suite   (_smoketest_)
+
+
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl|023  TAF Testbed 23: Test Suite Management: Perl Script Automation    Test Suite 3 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_|024  TAF Testbed 24: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_|025  TAF Testbed 25: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_|026  TAF Testbed 26: Test Suite Management:                       sub Test Suite   (_smoketest_)
+
+
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl|027  TAF Testbed 27: Test Suite Management: Perl Script Automation    Test Suite 4 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_|028  TAF Testbed 28: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_|029  TAF Testbed 29: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_|030  TAF Testbed 30: Test Suite Management:                       sub Test Suite   (_smoketest_)
+
+
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_|031  TAF Testbed 31: Test Suite Management: Powershell Script Automation Test Suite(_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_full_|032  TAF Testbed 32: Test Suite Management:                                        (_full_)
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_smoketest_|033  TAF Testbed 33: Test Suite Management:                                        (_smoketest_)
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_regressiontest_|034  TAF Testbed 34: Test Suite Management:                                        (_regressiontest_) 
+
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_|035  TAF Testbed 35: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_full_|036  TAF Testbed 36: Test Suite Management: Test Suite Hook (testsuite1/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_regressiontest_|037  TAF Testbed 37: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_smoketest_|038  TAF Testbed 38: Test Suite Management:                                        (_smoketest_)
+
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_|039  TAF Testbed 39: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_full_|040  TAF Testbed 40: Test Suite Management: Test Suite Hook (testsuite2/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_regressiontest_|041  TAF Testbed 41: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_smoketest_|042  TAF Testbed 42: Test Suite Management:                                        (_smoketest_)
+
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_|043  TAF Testbed 43: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_full_|044  TAF Testbed 44: Test Suite Management: Test Suite Hook (testsuite3/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_regressiontest_|045  TAF Testbed 45: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_smoketest_|046  TAF Testbed 46: Test Suite Management:                                        (_smoketest_)
+
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_|047  TAF Testbed 47: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_full_|048  TAF Testbed 48: Test Suite Management: Test Suite Hook (testsuite4/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_regressiontest_|049  TAF Testbed 49: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_smoketest_|050  TAF Testbed 50: Test Suite Management:                                        (_smoketest_)
+
+
 EOF
 close Fout;
 1;
@@ -4420,6 +4583,7 @@ sub prHtml1_strGen() {
 	my $markTS = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;Execution_24_7=n;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;mark')\" title=\"Make the beginning of a execution by \|\"> \|</a>");
 	my $listTS = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;list')\" title=\"Update webUI /o Tags (default)\">S</a>");
 	my $listTSAll = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;list')\" title=\"Update webUI /w Tags\">U</a>");
+	my $listTAFTestBed      = sprintf("<a href=\"${localUrl}/taf.txt\" title=\"Display TAF Testbed scripts\">E</a>");
 	my $indexthProperty = sprintf("<a href=\"${localUrl}/$SvrProjName/tsProperty.txt\" title=\"Display TS property\">L</a>");
 	my $tafGlobalVars = sprintf("<a href=\"${localUrl}/_tafGlobalVars.txt\" title=\"Display TAF Global Variables\">T</a>");
 	my $indexCmdLog   = sprintf("<a href=\"${localUrl}/_cmdLogs.txt\" title=\"Display TAF Cmd History\">S</a>");
@@ -4429,7 +4593,7 @@ sub prHtml1_strGen() {
 	my $indexUrlIIS = sprintf("<a href=\"${url}/$SvrProjName/index_http.htm\" title=\"Run TAF-Team Version based on IIS/http\"> <font color=\"white\">TC Manual Command</font></a>");
 	my $indexSeconds = "<a title=\"Execution time = $testsuiteTotalExecTime (s) \">(sec)</a>";
 	my $indexTitle = sprintf("<a href=\"${localUrl}/index.htm\" title=\"Run TAF-Team Version based on IIS/http\">$web_ui_title</a>");
-	my $indexResult = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtmlSummary\" title=\"Latest TC pass/fail (Gree/Red) Click to Display Test Suite Summary\">".substr ("Result                                                                                                                                               ", 0, $passFailDisplayWidth-6)."</a>");
+	my $indexResult = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtmlSummary\" title=\"Latest TC pass/fail (Gree/Red) Click to Display Test Suite Summary\">".substr ("Result                                                                                                                                               ", 0, $passFailDisplayWidth-7)."</a>");
 	my $tmp10 = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtmlSummary\" title=\"$reportHtmlSummaryStr\">");
 	my $passFailDisplay = &genPassFailDisplay("");
 	
@@ -4469,7 +4633,7 @@ my $indexHtml =<<EOF;
 <pre>
 <p>
 <h2>${indexTitle}</h2> 
-${indexResult}${listTS}${listTSAll}${indexthProperty}${tafGlobalVars}${indexCmdLog} ${stopTS}${markTS}${execTS} <a title=\"Click Testcase Desc to view TC logs\">$tcDescTitle     ${indexPassed}${indexOthers}${indexFailed}       ${indexSeconds}       ${indexUrlIIS}  </span>
+${indexResult}${listTAFTestBed}${listTS}${listTSAll}${indexthProperty}${tafGlobalVars}${indexCmdLog} ${stopTS}${markTS}${execTS} <a title=\"Click Testcase Desc to view TC logs\">$tcDescTitle     ${indexPassed}${indexOthers}${indexFailed}       ${indexSeconds}       ${indexUrlIIS}  </span>
 EOF
 
 	return $indexHtml; 
@@ -4506,7 +4670,7 @@ EOF
 
 
 __END__
-		TAF Function Summary  (Code Name: th.pl as of Sept 27, 2010)
+		TAF Function Summary  (Sept 27, 2011)
 ------------------------------------------------------------------------------------------
 TH Function Category     Function Name            Function Description
 ------------------------------------------------------------------------------------------
@@ -4739,6 +4903,10 @@ sub call_index { 		my $return ; my $recordCtr=1;
 }
 
 #################### Todo list: Functional Requirements ##########################
+# * add URL to c:\_TAF\taf.bat (taf.txt)                     		-done 01/29/2013
+# * add tsProperty.txt for testsuite1 and testsuite2			-done 01/29/2013
+# * bug mapTC shadows the listTC/execTC $rst				-done 01/23/2013 
+# * bug when there is no tags (_full_ and _smoketest_), _full_ will break the TAF
 # * create testbed regression 
 # * modify the ps1_args___powershell_args				-done 01/22/2013
 # * add the generateChildTestsuites  					-done 01/16/2013  (need further test)
