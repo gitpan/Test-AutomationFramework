@@ -32,7 +32,7 @@ initTAF
 );
 
 
-our $VERSION = '0.058.51';   	
+our $VERSION = '0.058.52';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty			; my %tafProperty	; my %tafPropertyRev; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0; my %recordTags=();
@@ -2016,7 +2016,9 @@ sub processTC {
  			$tcname = $tcname.$cmd; # handle -s delete=c:\_ts1_
  	    }
 	    $tcname =  &getTCName($tcname); 
-	    if (-e $tcname) { printf "%-20s %-40s ", "processTC:", $tcname   if (($outputFormat =~ /text/i) && ($pr2Screen ==1)) ; } # print for webUI 1/2
+	    if ((-e $tcname)||($tcOP =~ /create/i)) { printf "%-20s %-40s ", "processTC:", $tcname   if (($outputFormat =~ /text/i) && ($pr2Screen ==1)) ; } # print for webUI 1/2
+	    #if (-e $tcname) { printf "%-20s %-40s ", "processTC:", $tcname   if (($outputFormat =~ /text/i) && ($pr2Screen ==1)) ; } # print for webUI 1/2
+
 	    # printf "%-20s %-40s ", "processTC:", $tcname   if (($outputFormat =~ /text/i) && ($pr2Screen ==1)) ; # print for webUI 1/2
 	    my $tmp = sprintf "%-20s %-40s\n", "processTC: ", $tcname   ;
  	    &appendtoFile_($SvrDrive.'/'.$SvrProjName.'/'."_listHistory.txt", "$tmp");
@@ -3179,6 +3181,7 @@ sub setGlobalVars {
 	$url 			= 'file:///'.$SvrDrive;  		# will be updated in the sub-processTCs. Update derived Global Variable
 	$urlHttp		= 'http://'.$ip.$http_port;		# will be updated in the sub-processTCs. Update derived Global Variable
 	}
+	# if (($SvrTCNamePattern =~ /\//) || ($SvrTCNamePattern =~ /\\/)) { print "Error: Testcase can't have directory structure\n"; exit; }
 	$foundMatch;
 	#### &printTAFGlobalVars(); todo Non-volatile GlobalVars
 }
@@ -3645,7 +3648,6 @@ EOF
 			$propertyTmp =~ s/=/_eq_/g; 
 			$propertyTmp =~ s/ /__/g; 
 			&processProperty("",$tcnameTmp, "set_tcTags_as_$propertyTmp");
-
 		}
 	}
 
@@ -4787,7 +4789,11 @@ sub appendtoFileUniq_ { # fname, fileContent, maxTCExecTime
     my $fname_         = $fname."_"    ;
     my %record;
     while (-e $fname_) { my $mtime = ( stat $fname_)[9]; my $current_time = time;  my $diff = $current_time - $mtime; if ($diff > $MaxTCExecTime) { last; } sleep 1; }
+    #if (-e $fname ){		
+    if (-e $SvrDrive.'/'.$SvrProjName.'/'.$reportHtml1) {;} else { &createFile_($SvrDrive.'/'.$SvrProjName.'/'.$reportHtml1,"")	}; 
+    if (-e $SvrDrive.'/'.$SvrProjName.'/'.$reportHtml1_http) {;} else { &createFile_($SvrDrive.'/'.$SvrProjName.'/'.$reportHtml1_http,"")	}; 
     open Fin ,  "$fname"; while ($_ = <Fin>) { if ($_ =~ /exitTAFGracefullyString=(.+)\s*;\s*exitTAF/) { $record{$1} = $_; } } close Fin;
+    #}
 	if ( $content  =~ /exitTAFGracefullyString=(.+)\s*;\s*exitTAF/) {$record{$1} = $content;}
     open Fout, ">$fname_"; foreach my $each (sort keys %record) { print Fout $record{$each} } close Fout;
     move ($fname_, $fname);
@@ -5084,13 +5090,15 @@ sub appendtoFile_ { # fname, fileContent, maxTCExecTime
 
 sub appendtoFileFile_ {  	# TH:Generic Functions: append file to file (TH:Generic Functions)
     my $fname = $_[0]; my $fnameOUT = $_[1];
+#    if (-e $fname) {
     open Fin, "$fname" || die "Can't open $fname:$!";
     my $content;
     while ($_ = <Fin>) {
 	    if ($_ !~ /^\s*$/) {$content = $content .$_; } 
-    }
+     }
     close Fin;
-    	&appendtoFile_($fnameOUT, $content) ;
+    &appendtoFile_($fnameOUT, $content) ;
+#    }
 }
 
 ################################## concurrency file log ############################################
@@ -5482,7 +5490,8 @@ rem taf.pl testsuit=propertyChangedEvent;updateWeb=_testcase2_/1
 __END__
 
 #################### Todo list: Functional Requirements ################################
-# * Improvement: AutomationFramework.t won't work with dmake 
+# * Bug: 5089 open non-existence file (1st run bug) 			-done 04/22/2013
+# * Bug: 4790 open non-existence file (1st run bug) 			-done 04/22/2013
 # * Bug: Execution_24_7 won't update the historical &reportTCSummary () -done 04/20/2013
 # * Bug: Testsuite <- Testsuite displays default. Not real TS 		-done 04/20/2013
 # * Bug:  Variable is treated as testsuite ( if -e $tcname ) 		-done 04/20/2013
