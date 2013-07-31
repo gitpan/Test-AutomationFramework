@@ -6,8 +6,10 @@ use Test::AutomationFramework;
 my $cmd; my $rst; my $loaded = 1; my $tcName ; my $tcDesc ;  my $tcOp;
 my $taf= 'c:/_TAF/taf.pl';
 ########################## End of black magic.
-my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_; &test1_preA(); &test1_preB(); &test1_verifyA(); &test1_verifyB(); &test1_post(); 
+my $TAF_ = new Test::AutomationFramework; $TAF_->help(); undef $TAF_; 
 
+
+&test1_preA(); &test1_preB(); &test1_verifyA(); &test1_verifyB(); &test1_post(); 
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl Test-AutomationFramework.t'
 
@@ -204,6 +206,7 @@ sub regression4TC {
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+1/,  $tcDesc.': preProcessor'); 
+
 #	------ create Automated Test Case - retrun PASS
 	$tcName = "TC_tcA2"; $tcDesc = sprintf "%-40s","processTestCase (failed tc creation)";
    	$TAF->processTC("delete=$tcName"); 
@@ -211,9 +214,9 @@ sub regression4TC {
       	$TAF->processTC("create=$tcName"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
-	like ($TAF->processProperty($tcName,"get_tcRunResult"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
-#	like ($TAF->processProperty($tcName,"get_eq_tcRunResult;latest"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
 
+	like ($TAF->processProperty($tcName,"get_tcRunResult"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
+# like ($TAF->processProperty($tcName,"get_eq_tcRunResult;latest"), qr/pass/, $tcDesc.": TC return \'pass\'") ;
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+1/,  $tcDesc.': preProcessor'); 
 #	todo ------ create Automated Test Case - retrun PASS history 
