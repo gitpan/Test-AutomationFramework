@@ -225,7 +225,7 @@ sub regression4TC {
 	$tcName = "TC_tcA3"; $tcDesc = sprintf "%-40s","processTestCase (failed tc creation)";
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
-      	$TAF->processTC("create=$tcName;FailedTC"); 
+      	$TAF->processTC("create=$tcName;Fail"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
 	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/fail/, $tcDesc.": TC return \'fail\'") ;
@@ -236,7 +236,7 @@ sub regression4TC {
 	$tcName = "TC_tcA4"; $tcDesc = sprintf "%-40s","processTestCase (performance tc creation)";
    	$TAF->processTC("delete=$tcName"); 
    	unlike ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
-      	$TAF->processTC("create=$tcName;performanceTC"); 
+      	$TAF->processTC("create=$tcName;perf"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
 	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/\d+[\.\d+]?/, $tcDesc.": TC return \'float for performance TC\'") ;
@@ -261,9 +261,9 @@ sub regression4TC {
       	$TAF->processTC("create=$tcName"); 
    	like ($TAF->processTC("detect=$tcName"), qr/$tcName\s+exists/,  $tcDesc.': preProcessor'); 
 	$TAF->processTC("exec=$tcName"); 
-	$TAF->processTC("create=$tcName;FailedTC"); 
+	$TAF->processTC("create=$tcName;Fail"); 
 	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/pass/, $tcDesc.": TC overrite fails - Expected") ;
-      	$TAF->processTC("create=$tcName;FailedTC,overwrite"); 
+      	$TAF->processTC("create=$tcName;Fail,overwrite"); 
 	$TAF->processTC("exec=$tcName"); 
 	like ($TAF->processProperty($tcName,"_get_tcRunResult;latest"), qr/fail/, $tcDesc.": TC overrite succeed") ;
    	$TAF->processTC("delete=$tcName"); 
