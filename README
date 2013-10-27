@@ -13,8 +13,9 @@ TAF 3-steps Installation:
 
 	1. Strawberry Perl Installation from Internet
 
-	2. TAF Module Installation from Internet by perl -MCPAN -e "intall Test::AutomationFramework"
-	
+	2. TAF Module Installation from Internet by executing the following command 2 times 
+			perl -MCPAN -e "intall Test::AutomationFramework"
+	   	
 	   [Manual installation if the above step doesn't work 
 	   Download the Test-AutomationFramework.n.tar.gz file from CPAN and unzip 
 	   perl -MCPAN -e "install Date::Manip" (for Strawberry Perl) or ppm install Date::Manip (for ActivePerl)
@@ -38,7 +39,7 @@ Non-programming Usage:
 DEPENDENCIES
 
 	[FYI: TAF module requires the following modules and libraries, which should be installed by CPAN with TAF Module installaton:
-	Date::Manip 	File::Path      Test::More       Getopt::Long          File::Copy         File::Find         Cwd::getcwd]
+	Date::Manip 	File::Path      Test::More       Getopt::Long          File::Copy         File::Find         Cwd::getcwd  HTTP::Server::Simple.CGI]
 
 Copyright 2012 by Yong Wang (ywangperl@gmail.com) 
 

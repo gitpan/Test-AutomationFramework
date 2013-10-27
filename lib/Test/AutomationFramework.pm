@@ -37,7 +37,7 @@ fetchmail
 );
 
 
-our $VERSION = '0.059.01';   	
+our $VERSION = '0.060.01';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty			; my %tsPropertyRoot; my %tafProperty	; my %tafPropertyRev; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0; my %recordTags=();

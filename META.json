@@ -37,11 +37,12 @@
             "File::Copy::Recursive" : "0.38",
             "File::Path" : "2.0801",
             "Getopt::Long" : "2.38",
+            "HTTP::Server::Simple::CGI" : "0.44",
             "Regexp::Assemble" : "0.35",
             "Test::More" : "0.96"
          }
       }
    },
    "release_status" : "stable",
-   "version" : "v0.059.01"
+   "version" : "v0.060.01"
 }
