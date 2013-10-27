@@ -28,6 +28,7 @@ processTC
 processProperty
 genDriver_taf_pl
 genDriver_taf_cgi
+genDriver_taf_svr
 initTAF
 printVersion
 printTAFVersion
@@ -36,7 +37,7 @@ fetchmail
 );
 
 
-our $VERSION = '0.058.61';   	
+our $VERSION = '0.059.01';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty			; my %tsPropertyRoot; my %tafProperty	; my %tafPropertyRev; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0; my %recordTags=();
@@ -111,6 +112,7 @@ our $VERSION = '0.058.61';
 	my $NofTCinTSTemplate  		= -1;				# very useful variable 
 	my $SvrDrive 			= $c.'/'.$_TAF; 			# *:will be reset later in generated variable section
 	my $SvrProjName 		= '_testsuite1_'; 
+	my $SvrProjNameSub 		= ''; 
 	my $SvrTCName 			= '_testcase1_';
 	my $SvrTCNamePattern 		= "*"; 
 	my $SvrPropNamePattern 		= '.*';
@@ -730,8 +732,8 @@ sub generateRootIndex {					######### generate index.htm
 
 	my $queueSize=0; $queueSize = &Queue("", "queueSize");  
 
-	if ($queueSize > 0) { $queueSizeUI    = " <a href=\"$url/${queueFName}_active\" title=\"View waiting jobs\">$queueSize job(s) is/are waiting....</a>";} 
-	if ($queueSize > 0) { $queueSizeUICGI = " <a href=\"$urlHttp/${queueFName}_active\" title=\"View waiting jobs\">$queueSize job(s) is/are waiting....</a>";} 
+	if ($queueSize >  0) { $queueSizeUI    = " <a href=\"$url/${queueFName}_active\" title=\"View waiting jobs\">$queueSize job(s) is/are waiting....</a>";} 
+	if ($queueSize >  0) { $queueSizeUICGI = " <a href=\"$urlHttp/${queueFName}_active\" title=\"View waiting jobs\">$queueSize job(s) is/are waiting....</a>";} 
 	if ($queueSize == 0) { $queueSizeUI    = " <a style=\"color:grey\" href=\"$url/${queueFName}_active\" title=\"View waiting jobs\">$queueSize job(s) is/are waiting....</a>";} 
 	if ($queueSize == 0) { $queueSizeUICGI = " <a style=\"color:grey\" href=\"$urlHttp/${queueFName}_active\" title=\"View waiting jobs\">$queueSize job(s) is/are waiting....</a>";} 
 
@@ -772,7 +774,8 @@ find({preprocess=> sub {return sort @_;}, wanted=>sub { if ($File::Find::name =~
 	 }}, $SvrDrive);
   	foreach my $each1 (sort keys %tafUI) { print INDEX_Simple $tafUI{$each1} if (($each1 !~ /^\s*$c\/$_TAF\s*$/) && ($tafUI{$each1} !~ /_noShow_/i)); }
 
- 	foreach my $each (sort keys %tafUITreeView ) { 
+	foreach my $each (sort { &get1stColumn($tafProperty{$a}) cmp &get1stColumn($tafProperty{$b})} keys %tafUITreeView ) { 
+		# foreach my $each (sort keys %tafUITreeView ) { 
 		@_ = split(/<li>/,$tafUITreeView{$each}); my $NofTS; $NofTS = $#_; 
 		my $tsDesc ;  if ($tsPropertyRoot{$each}) { $tsDesc = "<a title=\"$each\">$tsPropertyRoot{$each}"; } else { $tsDesc = $each;}
 		if ($NofTS >2 ) {	print INDEX "<li>$tsDesc<ul>$tafUITreeView{$each}"."</ul></li>" if ($each !~ /$c\/$_TAF\s*$/i); }
@@ -796,7 +799,7 @@ close INDEX_Simple;
 	print FoutRootProperty "web_ui_title:  Test Automaiton Framework : web_ui_title\n";
 	foreach my $each (sort keys %tafRootProperty) { 
 		$each =~ s/\s*$//g;
-		printf FoutRootProperty "%-60s\|%4d  %-60s\n", $each, $ctr++, $each if ($each !~ /$SvrDrive\s*$/i); 
+		printf FoutRootProperty "%-60s\|%04d  %-60s\n", $each, $ctr++, $each if ($each !~ /$SvrDrive\s*$/i); 
 	}
 	close FoutRootProperty;
 	}
@@ -834,7 +837,8 @@ find({preprocess=> sub {return sort @_;}, wanted=>sub { if ($File::Find::name =~
 		}
 	 }}, $SvrDrive);
 
- 	foreach my $each (sort keys %tafUITreeView ) { 
+	foreach my $each (sort { &get1stColumn($tafProperty{$a}) cmp &get1stColumn($tafProperty{$b})} keys %tafUITreeView ) { 
+		# foreach my $each ( sort  keys %tafUITreeView ) { 
 		my $NofTS; @_ = split(/<li>/,$tafUITreeView{$each}); $NofTS = $#_; 
 		my $tsDesc ;  if ($tsPropertyRoot{$each}) { $tsDesc = "<a title=\"$each\">$tsPropertyRoot{$each}"; } else { $tsDesc = $each;}
 		if ($NofTS >2 ) {	print INDEX "<li>$tsDesc<ul>$tafUITreeView{$each}"."</ul></li>" if ($each !~ /$c\/$_TAF\s*$/i); }
@@ -853,7 +857,8 @@ close INDEX;
 	if ($exit_y_n =~ /exit/) { sleep $outputPause; exit; }
 1;
 }
-
+ 
+sub get1stColumn { my $str = shift;  if ($str){;} else {$str ="";}  $str =~ s/^\s*//g; @_ = split (/\s+/,$str); my $return = $_[0];  if ($return) {;} else {$return = "0000"; } return $return; }
 
 ####################### read Testsuite web_ui_title
 sub readWebTitle{ 
@@ -1408,7 +1413,8 @@ sub addURLs {
 	if ($SvrProjName_ =~ s/^$c_// ) {
 		;
 	} else {
-		print "\nInfo: $SvrProjName_ might have problem with the build-in file link (*.txt) \n($SvrProjName_ !~ $c_)\n\n" if ($^O =~ /linux/);  
+		; 
+		# print "\nInfo: $SvrProjName_ might have problem with the build-in file link (*.txt) \n($SvrProjName_ !~ $c_)\n\n" if ($^O =~ /linux/);  #### debug info: 
 	}
 
 
@@ -1418,7 +1424,7 @@ sub addURLs {
 			my $match1 = $1; my $logNameInLog = $2; my $match3=""; if ($3) {$match3 = $3."\n";;}
 			if ($logNameInLog =~ /\.txt\s*$/) { 
 				$logNameInLog =~ s/\\/\//g;
-				my $currentTime  = &UnixDate( "now", "%m-%d-%Y-%H_%M_%S" );
+				my $currentTime  = &UnixDate( "now", "%m-%d-%Y-%H_# %M_%S" );
 				my $fileFrom = $logNameInLog ; 
 				my $fileToFile   = &getTCName()."/".&getRoot_4($logNameInLog); $fileToFile =~ s/\.txt\s*$/_$currentTime\.txt/;
 				my $fileToHttp   = &getTCName()."/".&getRoot_4($logNameInLog); $fileToHttp =~ s/\.txt\s*$/_$currentTime\.txt/;
@@ -1884,7 +1890,8 @@ local @ARGV ;
 		      if ($propertyValue =~ /null/i) {$nullCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."n";}
 		      if ($propertyValue =~ /expF/i) {$nullCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."x";}
 		      if ($propertyValue =~ /bugF/i) {$nullCtr++; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."b";}
-		      if ($propertyValue =~ /dumy/i) {$nullCtr++;                                   ; $passFailDisplay = $passFailDisplay."d";}
+		      if ($propertyValue =~ /dumy/i) {          ;                                   ; $passFailDisplay = $passFailDisplay."d";}
+		      #if ($propertyValue =~ /dumy/i) {$nullCtr++;                                   ; $passFailDisplay = $passFailDisplay."d";}
 		      if ($propertyValue =~ /expected_F_a_i_l/i) {; $totalTime =$totalTime + $totalSec; $passFailDisplay = $passFailDisplay."x";}
 
 		      if ($propertyValue =~ /pass/i) {                                                $passFailDisplay_ = $passFailDisplay_."p $startTime: ${comment2}_|_";}
@@ -2382,13 +2389,11 @@ sub createTS_B {	# $NofTCinTSTenplate is a global var
 	mkpath $cmd;
 	open Fout, "> $cmd/index.pl";
 	my $tsNameTmp =	&getRoot($cmd);
-	print "pc: in createTS_B: $cmd/index.pl: $tsNameTmp";
 
 my %tcDesc; my %tcExec;
-#my $NofTCinTSTemplate = 5; 
 for (my $i = 1; $i <= $NofTCinTSTemplate; $i++) {
 	$tcExec{"$i"}="	if (\$ARGV[0] == $i) { print \\\"pass\\\"; } # <<< plug in the test case 1 here e.g. print `index.pl 1` ; >>>";
-	$tcDesc{"$i"}=" $i Test case Desc for TC1";
+	$tcDesc{"$i"}=" $i Test case Desc for TC$i";
 }
 
 print Fout <<EOF;
@@ -2403,7 +2408,7 @@ print Fout <<EOF;
 EOF
 
 my $ctr = 1;
-foreach my $each (sort keys %tcExec) { print Fout "if (\$ARGV[0] == ".$ctr++.") \{print Fout \"$tcExec{$each}\"; print \"null\";\}\n"; }
+foreach my $each (sort {$a <=> $b} keys %tcExec) { print Fout "if (\$ARGV[0] == ".$ctr++.") \{print Fout \"$tcExec{$each}\"; print \"null\";\}\n"; }
 
 print Fout <<EOF;
         close Fout;
@@ -2413,7 +2418,7 @@ EOF
 print Fout "\nprint<<EOF;\n";
 
    $ctr = 1;
-foreach my $each (sort keys %tcDesc) { print Fout $ctr++.". $tcDesc{$each}\n"; }
+foreach my $each (sort {$a <=> $b} keys %tcDesc) { print Fout $ctr++.". $tcDesc{$each}\n"; }
 
 print Fout "EOF\n}\n";
 
@@ -3092,6 +3097,7 @@ sub addProperty() { 	# add TC Property (TH:TC Managements)
     my $propertyName = $_[1];
     $propertyName =~ s/^\s*add\s*=//g;
     $propertyName =~ s/^\s*add\s*_eq_\s*//g;
+    if (-e $_[0]) {;} else { mkpath $_[0]; }
     open Fout, ">>$fname";
     	if ($propertyName =~ /\|/) { # for tcRunResult 
 		$propertyName =~ /^\s*(\S+)\s*\|\s*(\S+)\s*\|(.+)\s*$/; 
@@ -3388,6 +3394,8 @@ sub setGlobalVars {
 		elsif ($varName =~ /\bPropValuePattern\b/i)  	{ $SvrPropValuePattern= $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bTestSuit\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1; $SvrProjName =~ s/\\/\//g; $SvrProjName =~ s/$c\/$_TAF\///; }
 		elsif ($varName =~ /\bTestSuite\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1; $SvrProjName =~ s/\\/\//g; $SvrProjName =~ s/$c\/$_TAF\///;}
+		elsif ($varName =~ /\bsubTestSuite\b/i) 	{ $SvrProjNameSub = $varValue; $foundMatch = 1; $SvrProjNameSub =~ s/\\/\//g; $SvrProjNameSub =~ s/$c\/$_TAF\///;}
+		elsif ($varName =~ /\bTestSuiteSub\b/i) 	{ $SvrProjNameSub = $varValue; $foundMatch = 1; $SvrProjNameSub =~ s/\\/\//g; $SvrProjNameSub =~ s/$c\/$_TAF\///;}
 		elsif ($varName =~ /\bTCNameFilter\b/i) 	{ $SvrTCNamePattern = $varValue;$foundMatch = 1;}
 		elsif ($varName =~ /\bTCNameExecFilter\b/i) 	{ $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bTestCaseExec\b/i) 	{ $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
@@ -3854,12 +3862,80 @@ sub deleteTAFTestsuite {
         }
 }
 
+########### index2index
+
+sub index2index {       #### Generate subIndex from TAF-generate-index.pl       # input $tcDir, $matchStr
+
+	my $tcDir = $SvrProjName; 
+	my $matchStr = "2013.09.13"; $matchStr = shift if @_;
+
+        my @tcExec_; my @tcDesc_;        my $is_tcDesc="n";  my %tcDesc_; my %tcExec_;
+        if (-e "$tcDir/index.pl") {;} else {print "Warning: There is no $tcDir/index.pl. The taf.pl exit\n"; exit; }
+        open Fin, "$tcDir/index.pl"; my @index = <Fin>; close Fin;
+        foreach my $each (@index) {
+                if ($each =~ /ARGV\[0\]\s*==/) {
+                        $each =~ /\{(.+); print \"null\"/i;  $each = $1;
+                        $each =~ s/^\s*print\s+Fout\s+\"//g;
+                        $each =~ s/\"\s*$//g;
+                        push (@tcExec_, $each);
+                }
+                if ($each =~ /print<<EOF;/) { $is_tcDesc = 'y'; }
+                elsif ($each =~ /^EOF\b/) { $is_tcDesc = 'n'; }
+                elsif ($is_tcDesc =~ /y/i) { chop $each; push (@tcDesc_, $each);} }
+
+        for (my $i = 0; $i <= $#tcDesc_; $i++ )  {
+                if ($tcDesc_[$i] =~ /$matchStr/i) {
+                $tcDesc_{$i} = $tcDesc_[$i];
+                $tcExec_{$i} = $tcExec_[$i];
+                }
+        }
+
+if (-e "$tcDir/$matchStr") {;} else { mkpath ("$tcDir/$matchStr"); print " -dir-> $tcDir/$matchStr\n";} #### create new TS dir
+
+open INDEX , ">$tcDir/$matchStr/index.pl";
+print INDEX <<EOF;
+#!/usr/bin/perl.exe
+\$tcName = "AresPerformance";
+ if (\$^O =~ /win32/i) { \$_TAF = "c:"; } if (\$^O =~ /linux/i) { \$_TAF = "/tmp/var/www/cgi-bin"; }
+ \$tcDir = "\$_TAF/\$tcName";
+
+ if (\$ARGV[0]) {
+        open Fout, ">\$tcDir/$matchStr/_tcLogAppend.txt";
+
+EOF
+
+my $ctr = 1;
+foreach my $each ( sort keys %tcExec_) { print INDEX "if (\$ARGV[0] == ".$ctr++.") \{print Fout \"$tcExec_{$each}\\n\\\"; \\nThe results are also displayed at <a href=\\\"http://pdxnpgraph01.iovationnp.com\\\" >Graphite</a> _url_line_ \nprint \\\"null\\\"\";\}\n"; }
+
+print INDEX <<EOF;
+        close Fout;
+        } else {
+
+EOF
+print INDEX "\nprint<<EOF;\n";
+
+   $ctr = 1;
+foreach my $each (sort keys %tcDesc_) { print INDEX $ctr++.". $tcDesc_{$each}\n"; }
+
+print INDEX "EOF\n}\n";
+
+close INDEX;
+print " -> $tcDir/$matchStr/index.pl\n";
+}
+
+
+########### index2index
+
 
 sub generateTAFTestsuite {goto &generateTestsuite}
 sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnvil.pl 
 	my $cmd = $SvrProjName ;  $cmd = shift if @_;
 	#if ($cmd !~ /:/) { $cmd = $c.'/'.$_TAF.'/'.$cmd; }		linux
 	# This is a logic for window system (c:) if testsuite !~ c:\, it is a TAF TS under c:\_TAF\....
+
+	if ($SvrProjNameSub !~ /^\s*$/) { &index2index($SvrProjNameSub);  exit;}
+       
+
 	if ( $^O =~ /win32/i ) {	# window only logic
 		if ($cmd !~ /$c\//i) { $cmd = $c.'/'.$_TAF.'/'.$cmd; }
 	}
@@ -3867,8 +3943,14 @@ sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnv
 	$cmd =~ s/\/\//\//g;		# Fix the // problem in the linux coding
 
 	my $cwd = $cmd;
+
+	if ( -e $cwd) {;} else { mkpath $cwd;		#### bug fix 
+	if ($tsDriver =~ /null/i) { $tsDriver = "$cmd\/index.pl"; }	
+		&generatePerl_pl_template();	
+	}				
 	if (-e "$cmd\/index.ps1") { $cmd = $cmd . "\/index.ps1";	#### pre-existing testsuiteHook is index.ps1 
 		&generateIndex_pl ($cwd)			  ; 	# --> generate index.pl 
+		$cmd =~ s/index.ps1/index.pl/; 
 		}
 	elsif (-e "$cmd\/index.pl")     { 
 		$cmd = $cmd . "\/index.pl";}				#### pre-existing testsuiteHook is index.pl 
@@ -3876,12 +3958,12 @@ sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnv
 		if ($tsDriver =~ /null/i) { $tsDriver = "$cmd\/index.pl"; }	
 		&generatePerl_pl_template();
 	}								
+
 	##############################################  subroutine Main ###########################################
 	$cmd = shift if @_; my $testsuiteName="_default_testsuiteblas_"; my $testsuitePropertyFName='tsProperty.txt'; my $testDriverName = $cmd; 
 	my $tsPropertyStr = "web_ui_title: "; my $tcCtr=1; my $TAF= $SvrDrive ;
-
  	$testsuiteName = &getRoot_4($cwd);  			############ $testsuiteName = &getRoot(&getcwd());  
-
+if ($^O =~ /win32/i) { $testsuiteName =~ s/^\s*$_TAF//g; }
 	if (($TSHookIsPerl =~ /y/i) && ($cmd =~ /index\.ps1\s*$/))    { $cmd =~ s/index\.ps1\s*$/index\.pl /g;}	 
 
 	############ Generate Property file for webUI tc description
@@ -3893,7 +3975,6 @@ sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnv
 		elsif ($each =~ /_testdrivername_/i) { $each =~ /_testdrivername_\s*:\s*(.+)\s*$/i; $testDriverName = $1; }
 		else { ; }
 	}
-
 ####  <--$cmd       _testsuitename_ : [$testsuiteName] 
 ####  <--$cmd       _testdrivername_: [$testDriverName] 
 $testsuiteName =~ s/^\///g; # linux
@@ -4143,6 +4224,7 @@ EOF
 sub help {
 	&genDriver_taf_pl ();
 	&genDriver_taf_cgi ();
+	&genDriver_taf_svr ();
 
 my $help=<<EOF;
 -----------------------------------------------------------------------------------------------------------------------
@@ -4485,6 +4567,11 @@ sub genDriver_taf_cgi {
 	if (-e "$c/$_TAF/taf.cgi") {;} else { mkpath "$c/$_TAF"; open Fout, ">$c/$_TAF/taf.cgi"; print Fout &prDriverCGI(1); close Fout; print " --> $c/$_TAF/taf.cgi\n"; }
 	1;
 }
+sub genDriver_taf_svr {
+	if (-e "$c/$_TAF/taf.svr") {;} else { mkpath "$c/$_TAF"; open Fout, ">$c/$_TAF/taf.svr"; print Fout &prDriverSvr(1); close Fout; print " --> $c/$_TAF/taf.svr\n"; }
+	1;
+}
+
 
 sub genDriver_testbed {
 	if ($^O =~ /win32/i) { &genDriverWindow(); &delDriverWindow();}
@@ -4867,7 +4954,8 @@ EOF
 
 	open Fout, ">$c/$_TAF/taf.txt"; print Fout $testbed4Window; close Fout; print " --> $c/$_TAF/taf.txt\n"; my $cmd = "$c/$_TAF/taf.txt"; 
 	open Fout, ">$c/$_TAF/taf.bat"; print Fout $testbed4Window; close Fout; print " --> $c/$_TAF/taf.bat\n";    $cmd = "$c/$_TAF/taf.bat"; 
-	if ($^O =~ /linux/i) { print "Please exec $cmd manually\n";} }
+	if ($^O =~ /win32/i) { print "                           Please exec $cmd to setup testbed\n";} 
+	if ($^O =~ /linux/i) { print "                           Please exec $cmd to setup testbed\n";} }
 	1;
 }
 
@@ -5226,7 +5314,7 @@ REM ------------- Create TC/TS in directory $c/$_TAF...... ---------------------
 
 $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite1_${deli}deleteTAFTestsuite
 $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite2_${deli}deleteTAFTestsuite
-rem $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite3_${deli}deleteTAFTestsuite
+$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite3_${deli}deleteTAFTestsuite
 $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite4_${deli}deleteTAFTestsuite
 
 
@@ -5353,10 +5441,13 @@ EOF
 
 	open Fout, ">$c/$_TAF/taf_delete.txt"; print Fout $testbed4Window; close Fout; print " --> $c/$_TAF/taf_delete.txt\n"; my $cmd = "$c/$_TAF/taf_delete.txt"; 
 	open Fout, ">$c/$_TAF/taf_delete.bat"; print Fout $testbed4Window; close Fout; print " --> $c/$_TAF/taf_delete.bat\n";    $cmd = "$c/$_TAF/taf_delete.bat"; 
-	if ($^O =~ /win32/i) {if ( &enterY("Execute $c/$_TAF/taf_delete.bat (y/n)? ") =~ /y/) {system $cmd;} }
+	# if ($^O =~ /win32/i) {if ( &enterY("Execute $c/$_TAF/taf_delete.bat (y/n)? ") =~ /y/) {system $cmd;} }
 
 
-	if ($^O =~ /linux/i) { print "Please exec $cmd manually\n";} }
+	if ($^O =~ /win32/i) { print "                           Please exec $cmd to teardown testbed\n";} 
+	if ($^O =~ /linux/i) { print "                           Please exec $cmd to teardown testbed\n";} 
+
+	}
 
 	1;
 }
@@ -5573,49 +5664,49 @@ close Fout;
 open Fout, ">$c/$_TAF/tsProperty.txt";
 print Fout<<EOF;
 web_ui_title: Test Automation Framework : web_ui_title
-$c/$_TAF/_testsuite1_|001  TAF Testbed 1 : Test Case  Management: TC list, TC execution, TC Reporting /o TC Description
-$c/$_TAF/_testsuite2_|002  TAF Testbed 2 : Test Case  Management: TC list, TC execution, TC Reporting /o TC Description 
-$c/$_TAF/_testsuite3_|003  TAF Testbed 3 : Test Case  Management: Concurrency, Performance TCs, TC Logging, TC Description 
-$c/$_TAF/_testsuite4_|004  TAF Testbed 4 : Test Case  Management: Property operations : add/get properties 
+$c/$_TAF/_testsuite1_|0001  TAF Testbed 1 : Test Case  Management: TC list, TC execution, TC Reporting /o TC Description
+$c/$_TAF/_testsuite2_|0002  TAF Testbed 2 : Test Case  Management: TC list, TC execution, TC Reporting /o TC Description 
+$c/$_TAF/_testsuite3_|0003  TAF Testbed 3 : Test Case  Management: Concurrency, Performance TCs, TC Logging, TC Description 
+$c/$_TAF/_testsuite4_|0004  TAF Testbed 4 : Test Case  Management: Property operations : add/get properties 
 
-$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1|007  TAF Testbed 7 : Test Suite Management: Multiple test suite coexistence (testsuite1)
-$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1|008  TAF Testbed 8 : Test Suite Management: Multiple test suite coexistence (testsuite2)
-$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1|009  TAF Testbed 9 : Test Suite Management: Multiple test suite coexistence (testsuite3)
-$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1|010  TAF Testbed 10: Test Suite Management: Multiple test suite coexistence (testsuite4)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1|0007  TAF Testbed 7 : Test Suite Management: Multiple test suite coexistence (testsuite1)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1|0008  TAF Testbed 8 : Test Suite Management: Multiple test suite coexistence (testsuite2)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1|0009  TAF Testbed 9 : Test Suite Management: Multiple test suite coexistence (testsuite3)
+$c/$_TAF/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1|0010  TAF Testbed 10: Test Suite Management: Multiple test suite coexistence (testsuite4)
 
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl|011  TAF Testbed 11: ts1: perl testsuite hook /o tags _smoketest_, _regressiontest_
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl|012  TAF Testbed 12: ts2: perl testsuite hook /o tags _smoketest_, _regressiontest_
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl|013  TAF Testbed 13: ts3: perl testsuite hook /o tags _smoketest_, _regressiontest_
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl|014  TAF Testbed 14: ts4: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl|0011  TAF Testbed 11: ts1: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl|0012  TAF Testbed 12: ts2: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl|0013  TAF Testbed 13: ts3: perl testsuite hook /o tags _smoketest_, _regressiontest_
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl|0014  TAF Testbed 14: ts4: perl testsuite hook /o tags _smoketest_, _regressiontest_
 
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl|015  TAF Testbed 15: Test Suite Management: Perl Script Automation    Test Suite 1 (_full_, _smoketest_, _regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_|016  TAF Testbed 16: Test Suite Management:                       sub Test Suite   (_full_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_|017  TAF Testbed 17: Test Suite Management:                       sub Test Suite   (_regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_|018  TAF Testbed 18: Test Suite Management:                       sub Test Suite   (_smoketest_)
-
-
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl|019  TAF Testbed 19: Test Suite Management: Perl Script Automation    Test Suite 2 (_full_, _smoketest_, _regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_|020  TAF Testbed 20: Test Suite Management:                       sub Test Suite   (_full_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_|021  TAF Testbed 21: Test Suite Management:                       sub Test Suite   (_regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_|022  TAF Testbed 22: Test Suite Management:                       sub Test Suite   (_smoketest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl|0015  TAF Testbed 15: Test Suite Management: Perl Script Automation    Test Suite 1 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_|0016  TAF Testbed 16: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_|0017  TAF Testbed 17: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_|0018  TAF Testbed 18: Test Suite Management:                       sub Test Suite   (_smoketest_)
 
 
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl|023  TAF Testbed 23: Test Suite Management: Perl Script Automation    Test Suite 3 (_full_, _smoketest_, _regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_|024  TAF Testbed 24: Test Suite Management:                       sub Test Suite   (_full_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_|025  TAF Testbed 25: Test Suite Management:                       sub Test Suite   (_regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_|026  TAF Testbed 26: Test Suite Management:                       sub Test Suite   (_smoketest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl|0019  TAF Testbed 19: Test Suite Management: Perl Script Automation    Test Suite 2 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_|0020  TAF Testbed 20: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_|0021  TAF Testbed 21: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_|0022  TAF Testbed 22: Test Suite Management:                       sub Test Suite   (_smoketest_)
 
 
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl|027  TAF Testbed 27: Test Suite Management: Perl Script Automation    Test Suite 4 (_full_, _smoketest_, _regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_|028  TAF Testbed 28: Test Suite Management:                       sub Test Suite   (_full_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_|029  TAF Testbed 29: Test Suite Management:                       sub Test Suite   (_regressiontest_)
-$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_|030  TAF Testbed 30: Test Suite Management:                       sub Test Suite   (_smoketest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl|0023  TAF Testbed 23: Test Suite Management: Perl Script Automation    Test Suite 3 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_|0024  TAF Testbed 24: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_|0025  TAF Testbed 25: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_|0026  TAF Testbed 26: Test Suite Management:                       sub Test Suite   (_smoketest_)
 
 
-$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_|031  TAF Testbed 31: Test Suite Management: Powershell Script Automation Test Suite(_full_, _smoketest_, _regressiontest_)
-$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_full_|032  TAF Testbed 32: Test Suite Management:                                        (_full_)
-$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_smoketest_|033  TAF Testbed 33: Test Suite Management:                                        (_smoketest_)
-$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_regressiontest_|034  TAF Testbed 34: Test Suite Management:                                        (_regressiontest_) 
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl|0027  TAF Testbed 27: Test Suite Management: Perl Script Automation    Test Suite 4 (_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_|0028  TAF Testbed 28: Test Suite Management:                       sub Test Suite   (_full_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_|0029  TAF Testbed 29: Test Suite Management:                       sub Test Suite   (_regressiontest_)
+$c/$_TAF/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_|0030  TAF Testbed 30: Test Suite Management:                       sub Test Suite   (_smoketest_)
+
+
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_|0031  TAF Testbed 31: Test Suite Management: Powershell Script Automation Test Suite(_full_, _smoketest_, _regressiontest_)
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_full_|0032  TAF Testbed 32: Test Suite Management:                                        (_full_)
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_smoketest_|0033  TAF Testbed 33: Test Suite Management:                                        (_smoketest_)
+$c/$_TAF/_powershellTestsuite_/AppBuildpath/_automated_testsuites_/_testsuite_ps1_/_regressiontest_|0034  TAF Testbed 34: Test Suite Management:                                        (_regressiontest_) 
 
 REM testsuite Desc (tsDesc) example 
 $c/$_TAF/Autobat/Bat|Testsuite : Test suite of Tree structure and Test suite Node functon
@@ -5623,25 +5714,25 @@ $c/$_TAF/Autobat/Bat/QA_Tests|TAF Testsuite : Test suite Tree structure and Test
 $c/$_TAF/Autobat/Bat/QA_Tests/BATtests|TAF Testsuite : Test suite Tree structure and Test suite Node function
 
 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_|035  TAF Testbed 35: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_full_|036  TAF Testbed 36: Test Suite Management: Test Suite Hook (testsuite1/index.ps1) (_full_, _smoketest_, _regressiontest_) 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_regressiontest_|037  TAF Testbed 37: Test Suite Management:                                        (_regression tests_)
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_smoketest_|038  TAF Testbed 38: Test Suite Management:                                        (_smoketest_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_|0035  TAF Testbed 35: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_full_|0036  TAF Testbed 36: Test Suite Management: Test Suite Hook (testsuite1/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_regressiontest_|0037  TAF Testbed 37: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite1_/_smoketest_|0038  TAF Testbed 38: Test Suite Management:                                        (_smoketest_)
 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_|039  TAF Testbed 39: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_full_|040  TAF Testbed 40: Test Suite Management: Test Suite Hook (testsuite2/index.ps1) (_full_, _smoketest_, _regressiontest_) 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_regressiontest_|041  TAF Testbed 41: Test Suite Management:                                        (_regression tests_)
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_smoketest_|042  TAF Testbed 42: Test Suite Management:                                        (_smoketest_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_|0039  TAF Testbed 39: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_full_|0040  TAF Testbed 40: Test Suite Management: Test Suite Hook (testsuite2/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_regressiontest_|0041  TAF Testbed 41: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite2_/_smoketest_|0042  TAF Testbed 42: Test Suite Management:                                        (_smoketest_)
 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_|043  TAF Testbed 43: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_full_|044  TAF Testbed 44: Test Suite Management: Test Suite Hook (testsuite3/index.ps1) (_full_, _smoketest_, _regressiontest_) 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_regressiontest_|045  TAF Testbed 45: Test Suite Management:                                        (_regression tests_)
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_smoketest_|046  TAF Testbed 46: Test Suite Management:                                        (_smoketest_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_|0043  TAF Testbed 43: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_full_|0044  TAF Testbed 44: Test Suite Management: Test Suite Hook (testsuite3/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_regressiontest_|0045  TAF Testbed 45: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite3_/_smoketest_|0046  TAF Testbed 46: Test Suite Management:                                        (_smoketest_)
 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_|047  TAF Testbed 47: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_full_|048  TAF Testbed 48: Test Suite Management: Test Suite Hook (testsuite4/index.ps1) (_full_, _smoketest_, _regressiontest_) 
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_regressiontest_|049  TAF Testbed 49: Test Suite Management:                                        (_regression tests_)
-$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_smoketest_|050  TAF Testbed 50: Test Suite Management:                                        (_smoketest_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_|0047  TAF Testbed 47: Test suite Tree structure: Test suite Node (in develop)  of testsuite1
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_full_|0048  TAF Testbed 48: Test Suite Management: Test Suite Hook (testsuite4/index.ps1) (_full_, _smoketest_, _regressiontest_) 
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_regressiontest_|0049  TAF Testbed 49: Test Suite Management:                                        (_regression tests_)
+$c/$_TAF/Autobat/Bat/QA_Tests/BATtests/BAT/Automation_testsuite4_/_smoketest_|0050  TAF Testbed 50: Test Suite Management:                                        (_smoketest_)
 
 
 EOF
@@ -5649,7 +5740,111 @@ close Fout;
 1;
 }
 
+###########
 
+sub prDriverSvr { 
+my $driver=<<'EOF';
+#!/usr/bin/perl
+ {
+ package MyWebServer;
+ 
+ use HTTP::Server::Simple::CGI;
+ use base qw(HTTP::Server::Simple::CGI);
+ my %dispatch = (
+     '/hello' => \&resp_hello,
+ );
+ my $root = "c:/_TAF"; if ($^O =~ /win32/i ) { ;} elsif ($^O =~ /linux/i) { $root="/tmp/var/www/cgi-bin/_TAF";}
+ 
+ sub handle_request {
+     my $self = shift;
+     my $cgi  = shift;
+   
+     my $path = $cgi->path_info();
+     my $handler = $dispatch{$path};
+ 
+     if (ref($handler) eq "CODE") {
+         	print "HTTP/1.0 200 OK\r\n"; $handler->($cgi);
+     } elsif (-e "${root}${path}")  { 	
+		print "HTTP/1.0 200 OK\r\n";
+		if (${path} !~ /taf\.cgi/i) {	#### display html file
+			print $cgi->header , $cgi->start_html("$root$path");
+			open Fin, "$root$path"; @_ = <Fin>; close Fin; my $content = "@_"; print $cgi->body($content);
+			print $cgi->end_html;
+		} else { 			#### process taf.cgi 
+######################## sub taf_cgi {
+
+my $tafArgs = "help";
+   $tafArgs = $cgi->param("tafArgs");  
+if (($tafArgs =~ /exitTAFGracefullyString/i) && ($tafArgs !~ /;exitTAF/i)) { $tafArgs = $tafArgs.";exitTAF";}
+if ($^O =~ /win32/i ) { $tafArgs =~ s/_semi_/;/g; } if ($^O =~ /linux/i ) { $tafArgs =~ s/_semi_/\~/g; }
+$tafArgs =~ s/exitTAF=_null_/exitTAF/g;
+my $tafRedirectory = $cgi->param("tafRedirectory");
+my $refreshRate = 5;
+print $cgi->header, $cgi->start_html("$root$path");
+print "<pre>";
+if (($tafArgs =~ /Execution_local_only=y/i) && ($tafArgs =~ /Execution_from_cgi=y/i)) {
+	print "This test can NOT be executed over the network. Pleae execute the test from host w-PC/192.168.0.140. To Turn ON Remote Execution, email the administrator. \n" ;
+} else {
+	my $cmd = "start c:/_TAF/taf.pl $tafArgs";
+	print "Running at _host_/_ip_: $cmd\n";
+	system $cmd;
+}
+
+print<<EOF1;
+</pre>
+<meta http-equiv="refresh" content="$refreshRate; url=$tafRedirectory">
+EOF1
+print $cgi->end_html ;
+####################### }
+		}
+     } else {
+         print "HTTP/1.0 404 Not found\r\n";
+         print $cgi->header, $cgi->start_html('Not found'), $cgi->body("${root}$path is Not found");
+	 if (-e "${root}${path}") {
+		open Fin, "$root$path"; 
+			@_ = <Fin>; close Fin;
+		       	my $content = "@_";
+	        print $cgi->body("$content");
+		}
+               print $cgi->end_html;
+     }
+ }
+
+ 
+
+ sub resp_hello {
+     my $cgi  = shift;   # CGI.pm object
+     return if !ref $cgi;
+     
+     my $who = $cgi->param('name');
+     my  $dir = `C:/strawberry/perl/bin/perl.exe c:/_TAF/taf.pl -help`;
+     open Fin, "c:/_TAF/_blabla.html";
+     @_ = <Fin>; $file = "@_"; $file ="@_";
+     close Fin;
+     my $pathinfo = $cgi->path_info();
+     my $fullpath = $cgi->url(-full=>1);
+     print $cgi->header, $cgi->start_html("Hello"), 
+     $cgi->body("$file, $pathinfo, $fullpath"), 
+     $cgi->end_html;
+ }
+
+ 
+ } 
+ 
+ # start the server on port 8080
+ my $pid = MyWebServer->new(8080)->background();
+ print "Use 'kill $pid' to stop server.\n";
+
+EOF
+
+$driver =~ s/_host_/$hostname/ig;
+$driver =~ s/_ip_/$ip/ig;
+;
+# $c = "c:"; $_TAF = "_TAF";
+# open Fout, ">$c/$_TAF/taf.svr"; print Fout $driver ; close Fout; print " ->$c/$_TAF/taf.svr"; 
+if (@_) { return $driver;} else { print $driver;}
+}
+###########
 sub prDriver {
 	my $driver=<<EOF;
 #!/usr/bin/perl
@@ -5678,7 +5873,7 @@ if (\$cmdLine) {;} else {foreach \$each (\@ARGV) {\$cmdLine =\$cmdLine.\$each.';
 # Mult-user mode: can be done by modifying taf.pl 
 
 \$TAF->processTCs(\$cmdLine);
-print "debug: taf: done. Please uncomment this from taf.pl\\n";
+# print "debug: taf: done. Please uncomment this from taf.pl\\n";
 
 exit;
 if (\$cmdLine =~ /exitTAF/i)  { \$TAF->processTCs(\$cmdLine);  \$TAF->Queue("releaseLock"); } else { if (\$cmdLine) {\$TAF->Queue("push",\$cmdLine);} }
@@ -6715,20 +6910,34 @@ __END__
 
 #################### Todo list: Functional Requirements ################################
 # * improvement: runFromGmail in prog  (test fetchmail in linux; win/linux )
-# * requirement: createTS (numberOfTC = N) 				-done 09/24/2013   <- needs in test bed and tested on linux
-# * Integrate the taftaf.pl/index2index.pl to handle subTS
 # * bug? No () in the index.pl tcDesc/special character @, too long, tab
-# * research python as http/cgi server
-# * activate/test queue 
 # * $c collision temporal solution line 6206
-# * improvement: tsProperty with combination of TreeViewLevel
+# * testbed: improvement: tsProperty with combination of TreeViewLevel (local confg) need to be tested
 # * Testbed improvement: _thProperty_link.txt 
 # * Testbed improvement: _noShow_
 # * bug: One text link per line. need extra space at the line 1426 tail 
-#   <style type="text/css"> a { text-decoration:none}</style> underline -done 09/27/2013
-# * explore cygwin/bash .....  usages  c:\cg\bin/bash -l 		-doen 09/27/2013
+# * bug: fix the powershell bug (generateTAFTestsuite)*test*on linux    -done 10/26/2013
+# * taf.svr uses hostname and ip dynamically				-done 12/26/2013
+# * bug: the TC exec time is too small (null time shoul not be counted 	-done 10/26/2013
+# * todo test the genTAFDriver_Svr on linux system !!!!!!!!!!!!!! depend HTTP::Server::Simple::CGI
+# * research python as http/cgi server or CPAN : Solution: taf.svr 	-done 10/26/2013
+# * add genTAFDriver_SVR	to replacy mongoose (work on windowOS)	-done 10/25/2013
+# * activate/test queue 						-onhod10/12/2013 <- on hold
+# * explore cygwin/bash .....  usages (see plink.pl) 			-done 10/12/2013
+# * remove "Pleaes uncoment this from taf.pl message". Concurency 	-done 10/12/2013
+# Linux Only: comment print "\nInfo: $SvrProjName_ might have problem 	-done 10/12/2013
+  with the build-in file link (*.txt) \n($SvrProjName_ !~ $c_)\n\n"   	................
+  if ($^O =~ /linux/);  #### debug info: 				................
+#   <style type="text/css"> a { text-decoration:none} </style>		-done 10/10/2013
+# -----------------------------------------------------------------------done 09/30/2013
+# * Integrate the taftaf.pl/index2index.pl to handle subTS - $SvrProjNameSub ...........
+#	taf.pl testsuite=c:/aa;createTS					................
+#	taf.pl testsuite=c:/aa;subtestsuite=TC3;generateTestsuite	................
+# -----------------------------------------------------------------------done 09/30/2013
+# * createTS_B: sort {$a <=> $b}					-done 09/30/2013 
 # * improvement: printVersion printOSVersion has \n (need AF change)	-done 09/26/2013
 # * bug: __lt__  __gt__ are not converted to <> in tcLog.html (addURLs)	-done 09/25/2013
+# * requirement: createTS (numberOfTC = N) 				-done 09/24/2013   <- needs in test bed and tested on linux
 # * improvement: verify testcase =~ /$c/ at createTC			-done 09/25/2013
 # * improvement remove underline for url 				-done 09/25/2013
 # * improvement: add a url on webUI to run indexindex.pl (genSubTS) 	-n/a  09/24/2013
@@ -6865,6 +7074,7 @@ __END__
 # * _generateExcelReport.html (alignment for , )		    	-postponed
 # * improvement: tcDesc width can be self-adjusted		    	-postponed
 # * bug sometimes TS has not testcases (*U*pdate is the workaround) 	-postponed
+
 # * bug: queueFName missing $c/$_TAF					-done 04/30/2013
 # * bug: exitTAF should be handled separately				-done 04/30/2013
 # * bug: 5226 read on closed filehandle (can't be reproduced)		-doen 04/30/2013
