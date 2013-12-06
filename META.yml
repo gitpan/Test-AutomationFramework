@@ -26,4 +26,4 @@ requires:
   HTTP::Server::Simple::CGI: 0.44
   Regexp::Assemble: 0.35
   Test::More: 0.96
-version: v0.060.01
+version: v0.060.04

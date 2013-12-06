@@ -14,7 +14,7 @@ TAF 3-steps Installation:
 	1. Strawberry Perl Installation from Internet
 
 	2. TAF Module Installation from Internet by executing the following command 2 times 
-			perl -MCPAN -e "intall Test::AutomationFramework"
+			perl -MCPAN -e "install Test::AutomationFramework"
 	   	
 	   [Manual installation if the above step doesn't work 
 	   Download the Test-AutomationFramework.n.tar.gz file from CPAN and unzip 
@@ -24,7 +24,7 @@ TAF 3-steps Installation:
 	   dmake test
 	   dmake install]
 
-	3. TAF Testbed installation: perl -MCPAN -e "intall Test::AutomationFramework"
+	3. TAF Testbed installation: perl -MCPAN -e "install Test::AutomationFramework"
 
 Non-programming Usage:
 

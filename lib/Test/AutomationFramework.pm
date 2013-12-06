@@ -34,10 +34,12 @@ printVersion
 printTAFVersion
 printOSVersion
 fetchmail
+installTestbed
+deleteTestbed
 );
 
 
-our $VERSION = '0.060.01';   	
+our $VERSION = '0.060.04';   	
 
 ###################### TAF Global Variables ###############################
 	my %tsProperty			; my %tsPropertyRoot; my %tafProperty	; my %tafPropertyRev; my $propertyOp='';	my $regression=0; my $help=0; my $sleep4Display = 1; my $notUsegetTCName= 0; my %recordTags=();
@@ -68,11 +70,12 @@ our $VERSION = '0.060.01';
 	my $titleStatus		= "";
 	my $perl = $^X;  $perl =~ s/\\/\\\//g;	 # todo3 \\ linux
 	my $perl_ = $^X; $perl_=~ s/\\/\//g;	 # todo3 \\
-
+	my $listAll_var		="";
 ###################### TAF Generated Variables ###############################
 	my $scriptName 			= $0; $scriptName =~ s/\\/\//g;  # linux
 	my $workingDir			= getcwd(); 
 	my $TSHookName 			= "index.pl";
+	my $TSHookNameParent 		= "indexindex.pl";
 	my $TSHookNameGenerated 	= "index.pl";
 	my $createTS_index		= "createTS_index.pl";
 	my $createTS_indexindex		= "createTS_indexindex.pl";
@@ -185,7 +188,7 @@ our $VERSION = '0.060.01';
 	my $indexTitleRefreshRoot   = sprintf("<a href=\"${url}/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$c;_TAF=$_TAF;generateRootIndex')\" title=\"Refresh Root Index\" >    </a>");
 	my $indexTitleRefreshCGIRoot= sprintf("<a href=\"${urlHttp}/${cgi_bin}$tafCGI?tafArgs=SysDrive=${SvrDrive}_semi_generateRootIndex;tafRedirectory=${urlHttp}/$reportHtml_http\" title=\"Refresh Root Index\">    </a>");
 
-	if (-e "$c/$_TAF/_tafGlobalVars.txt") { &readTAFGlobalVars(); } # else { &printTAFGlobalVars();}  # Global Variables 
+	if (-e "$c/$_TAF/_tafGlobalVars.txt") { &readTAFGlobalVars(); } else { &printTAFGlobalVars();}  # Global Variables 
 
 	######### Generated Variables 
 	$SvrDrive 			= $c.'/'.$_TAF; 
@@ -206,6 +209,7 @@ sub tcLoop {			###### Testsuite Loop #####
 		&markDaily();
 		 $NofExecutionCtr++;
 		my $tcOp_ = $tcOp; if ($tcOp_ =~ /list/) {$tcOp_ = "list & update";}
+    		my $currentTime  = &UnixDate( "now", "%m/%d/%Y %H:%M:%S %Z" );
 		if ($pr2Screen == 1) { if (($NofExecution == 1) && ($Execution_24_7 ne 'y')){ print "Processing           $c/$_TAF/$SvrProjName     ($tcOp_)          <- Testsuite \n" if ($outputFormat =~ /text/i) ; } else {print "Processing ($NofExecutionCtrExec\/$NofExecution) ......\n" ; } } else { print "";}
 
 		if (($propertyOp =~ /^\s*$/) || ($propertyOp =~ /tcDescAuto/i)) { $NofExecutionCtrExec++; 
@@ -879,7 +883,12 @@ sub getTestsuiteTotalExecTime {
 	my $index= shift; my $index_; my $tsTotalExecTime = 0;
 		if (-e $index) {
 		open FinTS, $index; 
-		while ($_ = <FinTS>) { if ($_ =~ /^\s*<span\s+style="color:black;/i) { $_ =~ /(\d+)\s*\(s\)/; $tsTotalExecTime = $tsTotalExecTime + $1;} }
+		while ($_ = <FinTS>) { if ($_ =~ /^\s*<span\s+style="color:black;/i) { 
+				# $_ =~ /(\d+)\s*\(s\)/; $tsTotalExecTime = $tsTotalExecTime + $1;} 
+				if ($_ =~ /(\d\d):(\d\d):(\d\d)\s*\(s\)/) { $tsTotalExecTime = $tsTotalExecTime + $1 * 3600 + $2 * 60 + $3;}
+				elsif ($_ =~ /(\d+)\s*\(s\)/) { $tsTotalExecTime = $tsTotalExecTime + $1;}
+			} 
+		}
 		close FinTS;
 		} 
 	return &timeConvert($tsTotalExecTime); 
@@ -891,7 +900,6 @@ sub timeConvert {
 	my $hr  = int ($totalTime/3600); 
 	my $min = int (($totalTime - $hr*3600) / 60);
 	my $sec = int (($totalTime - $hr*3600 - $min * 60));
-	$totalTime = sprintf "%02d:%02d:%02d",$hr,$min,$sec;
 	$totalTime = sprintf "%02d:%02d:%02d",$hr,$min,$sec;
 }
 
@@ -1279,7 +1287,7 @@ sleep 10;
 sub runFromGmail {
 	my %record; my $value; my $key; my %record_file			; 
 	my $fetchmailFName      = "/var/spool/mail/qa_user"		; 
-	my $fetchmailFNameLocal = "/usr/local/iovation/bin/qa_user"	;
+	my $fetchmailFNameLocal = "/usr/local/iiiiiiii/bin/qa_user"	;
 	if (-e $fetchmailFNameLocal) { open Fin1, $fetchmailFNameLocal; while ($_= <Fin1>) { $_ = /_date_(.+)_subject_(.+)/; $record_file{$1}=$2;} close Fin2; }               # read local history file
 	if (-e $fetchmailFName     ) { open Fin , $fetchmailFName     ; while ($_= <Fin> ) { if (/^\s*Date:/) { chop; $key=$_; } elsif (/^\s*Subject: /) { chop; $value = $_; $record{$key}= $value;} } close Fin; }
 	else { print " $fetchmailFName doesn't exit\n"; exit;}
@@ -1418,20 +1426,23 @@ sub addURLs {
 	}
 
 
-		if (($_ !~ /href=\"/) && ($_ =~ /(.+)?($c\S+)\s?(.+)?/i) &&($_ !~ /_url_line_/i)) { # convert c:\abc.txt or c:/efg.txt <a href file= abc.txt </a>
+	# if (($_ !~ /href=\"/) && ($_ =~ /(.+)?($c\S+)\s?(.+)?/i) &&($_ !~ /_url_line_/i)) { # convert c:\abc.txt or c:/efg.txt <a href file= abc.txt </a>
+		if (($_ !~ /href=\"/) && ($_ =~ /(.+)?($c\S+)\s?(.+)?/i) &&($_ !~ /_url_line_/i) && ($_ !~ /_cmd_line_/i) && ($_ !~ /\-runAsCmd/i)) { # convert c:\abc.txt or c:/efg.txt <a href file= abc.txt </a>
 			$_ =~ s/</__lt__/g; $_ =~ s/>/__gt__/g; 
 			$_ =~ /(.+)?($c\S+)\s?(.+)?/i; 
 			my $match1 = $1; my $logNameInLog = $2; my $match3=""; if ($3) {$match3 = $3."\n";;}
-			if ($logNameInLog =~ /\.txt\s*$/) { 
+			#if ($logNameInLog =~ /\.txt\s*$/) { 
+			if (($logNameInLog =~ /\.txt\s*$/) || ($logNameInLog =~ /\.htm\s*$/)) { 
 				$logNameInLog =~ s/\\/\//g;
-				my $currentTime  = &UnixDate( "now", "%m-%d-%Y-%H_# %M_%S" );
+				my $currentTime  = &UnixDate( "now", "%m-%d-%Y-%H_%M_%S" );
 				my $fileFrom = $logNameInLog ; 
 				my $fileToFile   = &getTCName()."/".&getRoot_4($logNameInLog); $fileToFile =~ s/\.txt\s*$/_$currentTime\.txt/;
 				my $fileToHttp   = &getTCName()."/".&getRoot_4($logNameInLog); $fileToHttp =~ s/\.txt\s*$/_$currentTime\.txt/;
 				$_ =~ s/__lt__/&lt;/g; $_ =~ s/__gt__/&gt;/g;
 				if ( -e $fileFrom ) { 
 					if ( -e &getDir($fileToFile)){ ; } else {mkpath &getDir($fileToFile); }
-					copy ($fileFrom, $fileToFile);
+					# copy ($fileFrom, $fileToFile);
+					&addHtml ($fileFrom, $fileToFile);
 					$fileToHttp =~ s/$c\/$_TAF/${ip}${http_port}/;	
 					$return = $return.$match1."<a href=\"http://$fileToHttp\"  >(http:$fileFrom)</a> $match3";
 					#### tech reserver $return = $return.$match1."<a href=\"file:////$fileToFile\">(file:$fileFrom)</a> $match3";
@@ -1479,7 +1490,8 @@ sub addURLs_old {
 			my $currentTime  = &UnixDate( "now", "%m-%d-%Y-%H_%M_%S" );
 			my $fileFrom = $match2; 
 			my $fileTo   = $match2; $fileTo =~ s/\.txt\s*$/_$currentTime\.txt/;
-			copy ($fileFrom, $fileTo);
+			#copy ($fileFrom, $fileTo);
+			&addHtml ($fileFrom, $fileTo);
 			$return = $return.$match1."<a href=\"file:////$fileTo\">$fileTo</a>$match3\n";
 			} else {
 			$return = $return.$_."\n";
@@ -1490,6 +1502,75 @@ sub addURLs_old {
 	} 
 
 $return ;
+}
+
+sub addHtml {
+	my $FNameFrom	= shift; my $FNameTo  	= shift; my $str;
+	if (-e &getDir($FNameTo)) {;} else { mkpath &getDir($FNameTo);}
+	if (-e $FNameFrom) {
+		open FNameTo  , ">$FNameTo"; 
+		open FNameFrom, $FNameFrom ; @_ = <FNameFrom>; $str .= "@_"; close FNameFrom;
+		
+		$str =~ s/\r|\n/_realReturn_/ig; 
+		$str =~ s/\x{d}/_return_/ig; $str =~ s/\s*\x{8}//ig; 	# processing return and BS 
+		$str =~ s/_return_/....../g; # $str =~ s/\s+/_space_/g; $str =~ s/_space_/ /g;
+		$str =~ s/</      ..../ig if ($str !~ /<a/);
+		$str =~ s/>/      ..../ig if ($str !~ /a>/);
+		$str =~ s/(_realReturn_)+/\n/g;
+		$str = "\n<pre>\n$str\n</pre>\n";
+
+		print FNameTo $str;
+		close FNameTo;
+	} else {
+	print "Warning: addHtml: $FNameFrom deesn't exist!\n";
+	}
+
+}
+sub addHtml_v1 {
+	my $FNameFrom	= shift; my $FNameTo  	= shift; my $str;
+	if (-e &getDir($FNameTo)) {;} else { mkpath &getDir($FNameTo);}
+	if (-e $FNameFrom) {
+		open FNameTo  , ">$FNameTo"; 
+		open FNameFrom, $FNameFrom ; @_ = <FNameFrom>; $str .= "@_"; close FNameFrom;
+		
+		$str =~ s/\r|\n/_realReturn_/ig; 
+		$str =~ s/\x{d}/_return_/ig; $str =~ s/\s*\x{8}//ig; 	# processing return and BS 
+		$str =~ s/_return_/....../g; $str =~ s/\s+/_space_/g; $str =~ s/_space_/ /g;
+		$str =~ s/</      ..../ig ; #if ($str !~ /<a/);
+		$str =~ s/>/      ..../ig ; # if ($str !~ /a>/);
+		$str =~ s/(_realReturn_)+/\n/g;
+		$str = "\n<pre>\n$str\n</pre>\n";
+
+		print FNameTo $str;
+		close FNameTo;
+	} else {
+	print "Warning: addHtml: $FNameFrom deesn't exist!\n";
+	}
+
+}
+sub addHtml_v0 {
+	my $FNameFrom	= shift; my $FNameTo  	= shift;
+	if (-e &getDir($FNameTo)) {;} else { mkpath &getDir($FNameTo);}
+	if (-e $FNameFrom) {
+		open FNameTo  , ">$FNameTo"; 
+		print FNameTo "\n<pre>\n";
+		open FNameFrom, $FNameFrom ; @_ = <FNameFrom>; 
+		my $str = "@_"; 
+		$str =~ s/\x{d}+/_rtn_/ig;	
+		$str =~ s/\x{d}+/_rtn_/ig;	
+		$str =~ s/\x{d}+/_rtn_/ig;	
+		$str =~ s/\x{d}+/_rtn_/ig;	
+		$str =~ s/\x{d}+/_rtn_/ig;	
+		$str =~ s/\s*\x{8}/_bs_/ig;	
+		#print FNameTo "@_";
+		print FNameTo $str;
+		print FNameTo "</pre>\n";
+		close FNameFrom;
+		close FNameTo;
+	} else {
+	print "Warning: addHtml: $FNameFrom deesn't exist!\n";
+	}
+
 }
 
 sub ps12txt {
@@ -1941,11 +2022,14 @@ local @ARGV ;
 
 		my $TCDesc_display__ = $TCDesc_display_;
 
-		$TCDesc_display__ =~ s/&lt;|&gt;|&amp;|&#37;|&#36;/X/g;
+		# $TCDesc_display__ =~ s/&lt;|&gt;|&amp;|&#37;|&#36;|&#166;/X/g;
+		$TCDesc_display__ =~ s/&lt;|&gt;|&amp;|&#37;|&#36;|&#166;|&#40;|&#41;/X/g;
 
 		my $n1 = ()  = $TCDesc_display_ =~ /&lt;|&gt;/g;
-		my $n2 = ()  = $TCDesc_display_ =~ /&amp;|&#37;|&#36;/g;
-		my $extra = $n1 * 3 + $n2 * 4 ; 
+		# my $n2 = ()  = $TCDesc_display_ =~ /&amp;|&#37;|&#36;/g;
+		my $n2 = ()  = $TCDesc_display_ =~ /&amp;|&#37;|&#36;|&#40;|&#401;/g;
+		my $n3 = ()  = $TCDesc_display_ =~ /&#166;/g;
+		my $extra = $n1 * 3 + $n2 * 4 + $n3 * 5; 
 
 		my $webUI_TCDescWidth_extra = $webUI_TCDescWidth + $extra ;
 
@@ -1959,6 +2043,7 @@ local @ARGV ;
 	} else { $TCDesc_display = sprintf "%-${webUI_TCDescWidth}s", $tcname; }
 
 	# prHtml3 mark for search
+
 
 	my $tcSerialN = $TCDesc_display; 
 	if ($tcSerialN =~ /^\s*\d+\D+/) {$tcSerialN =~ /^\s*(\d+)\D+/; $tcSerialN = "$1"; if ($tcSerialN) {;} else {$tcSerialN = "";}}
@@ -1974,11 +2059,11 @@ local @ARGV ;
 	my $runTS24_7 = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName Execution_from_cgi=$Execution_from_cgi;Execution_local_only=$Execution_local_only;drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseExec=$dirRoot;ExecutionType=runTC;Execution_24_7=y;exec')\"  title=\"Exec Test 24/7 (Testcase Number == $tcSerialN)\"> ,</a>"; 
 	my $runTCOnce = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName Execution_from_cgi=$Execution_from_cgi;Execution_local_only=$Execution_local_only;drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseExec=$dirRoot;ExecutionType=runTC;exec')\"  title=\"$TCCtrToolTip\">></a>";
 	my $runTSOnce = "<a href=\"${url}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName Execution_from_cgi=$Execution_from_cgi;Execution_local_only=$Execution_local_only;drive=$SvrDrive;tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;tcIdMin=$tcIdCtr;testsuit=$SvrProjName;ExecutionType=runTS;exec')\"  title=\"$TCCtrToolTipMin\"><marquee style=\"border:RED ${borderWidth}px ${borderStyle}\" width=48 direction=right behavior=alternate loop=10000 scrollamount=$scrollAmount>>\|</marquee></a>"; 
-	my $html = sprintf( "<span style=\"color:black;\">$passFailDisplay${stopTS}$runTS24_7<font color=\"$color[$colorIndex]\"> $runTCOnce $runTSOnce</font><a href=\"${url}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\">%-${webUI_TCDescWidth}s</a> <a href=\"${url}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">%5d/%-5d</a> %6d(s)   $tcTags    <font color=\"white\"> %s </font></span>\n",
+	my $html = sprintf( "<span style=\"color:black;\">$passFailDisplay${stopTS}$runTS24_7<font color=\"$color[$colorIndex]\"> $runTCOnce $runTSOnce</font><a href=\"${url}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\">%-${webUI_TCDescWidth}s</a> <a href=\"${url}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">%5d/%-5d</a> %10s   $tcTags    <font color=\"white\"> %s </font></span>\n",
 		    $TCDesc_display,
                     $passCtr,
                     $failCtr,
-                    $avgResponseTime,
+                    &formatSeconds($avgResponseTime),
 		    $tcname.'/tc.pl',
                 );
 
@@ -1994,11 +2079,11 @@ local @ARGV ;
 	$runTCOnce=~ s/;/_semi_/g; $runTCOnce=~ s/_realSemi_/$_realSemi_/g;
 	$runTSOnce=~ s/;/_semi_/g; $runTSOnce=~ s/_realSemi_/$_realSemi_/g;
 
-	my $html_http = sprintf( "<span style=\"color:black;\">$passFailDisplay${stopTS}$runTS24_7<font color=\"$color[$colorIndex]\"> $runTCOnce $runTSOnce</font><a href=\"${urlHttp}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\">%-${webUI_TCDescWidth}s</a> <a href=\"${urlHttp}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">%5d/%-5d</a> %6d{s}   $tcTags    <font color=\"white\"> %s </font></span>\n",
+	my $html_http = sprintf( "<span style=\"color:black;\">$passFailDisplay${stopTS}$runTS24_7<font color=\"$color[$colorIndex]\"> $runTCOnce $runTSOnce</font><a href=\"${urlHttp}/$SvrProjName/".&getTCNameStr($SvrTCName)."/_tcLog.html\" title=\"$TCDesc_displayTip\">%-${webUI_TCDescWidth}s</a> <a href=\"${urlHttp}/$SvrProjName/${reportHtmlHistory}#$tcname\" title=\"Click to see Pass/Fail history\">%5d/%-5d</a> %10s   $tcTags    <font color=\"white\"> %s </font></span>\n",
 		    $TCDesc_display,
                     $passCtr,
                     $failCtr,
-                    $avgResponseTime,
+                    &formatSeconds($avgResponseTime),
 		    $tcname.'/tc.pl',
                 );
 
@@ -2081,7 +2166,32 @@ sub processTSs{
 		if ($each !~ /=/) {
 			if ($each =~ /\bmarkblablaaaaa\b/i) { 							;
 			} else  {
-				; 
+				# print "pa: $each\n";
+				  my %record;
+					&processTCs("", "listAll");  
+					my $rst = $listAll_var; 
+					@_ = split (/\n|\r/, $rst);
+					foreach my $each (@_) { 
+						$each =~ s/^$c//g;
+						$each =~ s/^[\/|\\]//g;
+						$each =~ s/^$_TAF//g;
+						$each =~ s/^[\/|\\]//g;
+						$each =~ s/testcase\d\d\d\d.*$//g;
+						$each =~ s/[\/|\\]\s*$//g;
+						$record{$each}=$each;
+						}
+				if ($each =~ /listTS/i) { # list all available TS 
+					foreach my $each (sort keys %record) { print "$each\n"; }
+				} elsif ($each =~ /deleteTSs/i) { 
+					foreach my $each (sort keys %record) { 
+						print "pc: $SvrProjName, $each\n"; 
+
+						# &deleteTAFTestsuite();
+					
+					}
+				}
+
+
  				#print "pd: $SvrProjName,  $each\n"; my $str =  "\&$each();"; my $rst = eval $str; next				;  
 			}
 		} else {
@@ -2134,7 +2244,21 @@ sub processTCs{
 				&setGlobalVars("","tcOP=mark")							;
 				$isBatchProcessing = 1								;
 			} elsif ($each =~ /\blistAll\b/i) { 							;
-			 	$SvrTCNamePattern =".*";  &listAll()						; 
+			 	$SvrTCNamePattern =".*";  print &listAll()					; 
+				$isBatchProcessing = 0								;		
+			} elsif ($each =~ /refreshTS/i) {							;
+				&deleteTAFTestsuite()								;
+				&generateTAFTestsuite()								;
+				$isBatchProcessing = 0								;		
+			} elsif ($each =~ /refreshHost/i) {							;
+				#print "pa: $c/$_TAF/$tsProperty\n"; need to test on linux
+				unlink "$c/$_TAF/$tsProperty";
+				&generateRootIndex()								;
+				&generateRootIndex()								;
+				$isBatchProcessing = 0								;		
+			} elsif ($each =~ /releaseLock|refreshLock|refreshQueue|resetLock|resetQueue/i) {							;
+				&Queue("","releaseLock");
+				# &generateTAFTestsuite()								;
 				$isBatchProcessing = 0								;		
 			} elsif ($each =~ /customer1/i) {
 				&customer1();
@@ -2157,7 +2281,7 @@ sub processTCs{
 				}
 			} else { next; } 
 		}
-	if ($isBatchProcessing == 1) { if ($Execution_24_7 !~ /y/i) {$NofExecutionCtrExec=0}; $NofExecutionCtr = 0;  &tcLoop();}		# NofExecutionCtr reset for each list/exec
+	if ($isBatchProcessing == 1) { if ($Execution_24_7 !~ /y/i) {$NofExecutionCtrExec=0}; $NofExecutionCtr = 0;  &tcLoop(); }		# NofExecutionCtr reset for each list/exec
 	} 
 
 }
@@ -2179,7 +2303,7 @@ sub processTC {
 		if ($tcOP =~ /\blistAll\b/i) {
 			# SvrTCName as a regExp
 			if ($tcname =~ /^\s*$/) { $SvrTCNamePattern =".*";} else { $SvrTCNamePattern = $tcname; } 
-			&listAll(); 
+			print &listAll(); 
 			return; 
 			}
 	    ######## The following are for TC processing 	    
@@ -2341,6 +2465,43 @@ sub recursiveSearchListAll() {
 }
 
 sub createTS {		# Create Testsuite for Testbed 
+	# 1 create index.pl from /tmp/createTS_indexindex.pl	
+	# 2 create index.pl from /tmp/createTS_index.pl
+	# 3 create powershell HelloWorld TS (index.pl and index.ps)
+	# 4 create Perl       HelloWorld TS (index.pl)
+	# &generateTAFTestsuie() displays TS on webUI
+
+
+	if ($SvrProjName !~ /$c/i) { print "Warning: testcase should start with $c\n"; }
+	my $tsName = $SvrProjName; $tsName = shift if @_;
+	$SvrProjName = $tsName; if (-e $SvrProjName) {;} else { mkdir $SvrProjName; }
+
+	if (-e "$SvrProjName/$TSHookNameParent") {
+		my $rst = `$perl $SvrProjName/$TSHookNameParent`;
+		print "$SvrProjName/$TSHookName is generated from $SvrProjName/$TSHookNameParent\n";
+		;
+	} elsif (-e "$c/$_TAF/$createTS_indexindex" ) {
+		print " --> Create $SvrProjName    <- from $c/$_TAF/$createTS_indexindex\n"; 
+		copy ("$c/$_TAF/$createTS_indexindex", "$SvrProjName/$createTS_indexindex");
+		print "$SvrProjName/$createTS_indexindex is running ......\n";
+		my $rst = `$perl $SvrProjName/$createTS_indexindex`;
+		print "$SvrProjName/$createTS_indexindex is completed.....\n";
+	} elsif (-e "$c/$_TAF/$createTS_index" ) {
+		print " --> Create $SvrProjName    <- from $c/$_TAF/$createTS_index\n"; 
+		move ("$c/$_TAF/$createTS_index", "$SvrProjName/$TSHookNameGenerated");
+	} elsif ($SvrProjName =~ s/_powershell_//i)  { 
+		print " --> Create Powershell Testsuite: $SvrProjName\n"; &generatePowershell_ps1_template($SvrProjName); 
+	} elsif ($NofTCinTSTemplate != -1 ) {
+		&createTS_B($SvrProjName);
+	} else { 
+		print " --> Create Perl Testsuite: $SvrProjName\n";       &generatePerl_pl_template($SvrProjName); 
+	}
+	&generateTAFTestsuite ();
+1;
+}
+
+
+sub createTS_save {		# Create Testsuite for Testbed 
 
 	if ($SvrProjName !~ /$c/i) { print "Warning: testcase should start with $c\n"; }
 	my $tsName = $SvrProjName; $tsName = shift if @_;
@@ -2380,6 +2541,130 @@ sub listTS   {
 	$SvrProjName = $tsName;
 	&processTCs ("","tcDelay=0;performanceMode=fast;testcaseNode=$testcaseNode;testsuite=$SvrProjName;AutomationtsName=$SvrProjName;list"); 
 	return 1;
+}
+
+sub generateIndexIndexIndex {
+my $str=<<'EOFIndex3'
+use File::Path;
+$tcName = "_testsuite1_";
+if ($ARGV[0] =~ /\bh\b/i) {
+print<<EOF;
+	##############################################################################
+	Purpose: create a skeleton of indexindex.pl for AF delivery testing 
+
+	Format : $0 tsName (like _testsuit1_)
+
+	Output c:/iiiiiiii/\$tsName/indexindex.pl 
+	##############################################################################
+
+	[WindowOS]
+      * T Purpose: Delivery TS (indexindex.pl) commands
+	Setup    : c:/iiiiiiii/bin/indexindexindex.pl _testsuite4_
+	Execution: c:/iiiiiiii/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action installIndexIndex -tsName _testsuite4_
+	Verify.  : WebUI http://pppppppppp01.iiiiiiiinp.com:1234/index_http.htm   has _testsuite4_
+	Teardown : c:/iiiiiiii/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action delete -tsName _testsuite3_
+
+      *	T Purpose: Delivery TS (index.pl) commands
+	Setup    : c:/_TAF/taf.pl testsuite=c:/iiiiiiii/_testsuite5_;createTS
+	Execution: c:/iiiiiiii/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action installIndex -tsName _testsuite5_ 
+	Verify.  : WebUI http: http://pppppppppp01.iiiiiiiinp.com:1234/index_http.htm   has _testsuite5_
+	Teardown : c:/iiiiiiii/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action delete -tsName _testsuite5_
+
+
+	[LinuxOS]
+      * T Purpose: Delivery TS (indexindex.pl) commands
+	Setup    : /usr/bin/perl /tmp/var/www/cgi-bin/indexindexindex.pl _testsuite4_
+	Execution: /usr/bin/perl /tmp/var/www/cgi-bin/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action installIndexIndex -tsName _testsuite4_
+	Verify.  : WebUI http://pppppppppp01.iiiiiiiinp.com:1234/index_http.htm   has _testsuite4_
+	Teardown : /usr/bin/perl /tmp/var/www/cgi-bin/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action delete -tsName _testsuite3_
+
+      *	T Purpose: Delivery TS (index.pl) commands
+	Setup    : /usr/bin/perl /tmp/var/www/cgi-bin/_TAF/taf.pl testsuite=/tmp/var/www/cgi-bin/_testsuite5_~createTS
+	Execution: /usr/bin/perl /tmp/var/www/cgi-bin/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action installIndex -tsName _testsuite5_ 
+	Verify.  : /usr/bin/perl /tmp/var/www/cgi-bin/ WebUI http: http://pppppppppp01.iiiiiiiinp.com:1234/index_http.htm   has _testsuite5_
+	Teardown : /usr/bin/perl /tmp/var/www/cgi-bin/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action delete -tsName _testsuite5_
+
+	Note: Remote Test Case and Test Suite Execution Commands 
+
+	c:/iiiiiiii/AutomationFramework/index.pl          -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action installIndexIndex -tsName _testsuite4_
+	/tmp/var/www/cgi-bin/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action installIndexIndex -tsName _testsuite4_
+
+	c:/iiiiiiii/AutomationFramework/index.pl          -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action run -tsName _testsuite4_~testcase=testcase0006
+	/tmp/var/www/cgi-bin/AutomationFramework/index.pl -runAsCmd -host pppppppppp01.iiiiiiiinp.com -action run -tsName _testsuite4_~testcase=testcase0006
+	
+
+EOF
+exit;
+}
+if ($ARGV[0]) {$tcName = $ARGV[0]; }
+my $tcDir = "/tmp/var/www/cgi-bin/$tcName"; if ($^O =~ /linux/) { $tcDir = "/tmp/var/www/cgi-bin/$tcName"; } elsif ($^O =~ /win32/i) { $tcDir = "c:/iiiiiiii/$tcName"; }
+
+if (-e $tcDir ) {;} else { mkpath $tcDir ;}
+my $index = "$tcDir/indexindex.pl"; my $ctr; my %tcExec ; my %tcDesc;
+
+open Fout, "> $index"; 
+
+my $str=<<'EOF3';
+use File::Path;
+$tcName = "_testsuite1_";
+
+my $tcDir = "/tmp/var/www/cgi-bin/$tcName"; if ($^O =~ /linux/) { $tcDir = "/tmp/var/www/cgi-bin/$tcName"; } elsif ($^O =~ /win32/i) { $tcDir = "c:/iiiiiiii/$tcName"; }
+
+if (-e $tcDir ) {;} else { mkpath $tcDir ;}
+my $index = "$tcDir/index.pl"; my $ctr; my %tcExec ; my %tcDesc;
+
+	open Fout, ">$index";
+my $str=<<'EOF1'
+#!C:/strawberry/perl/bin/perl.exe
+$tcName = "_testsuite1_";
+if ($^O =~ /win32/i) { $_TAF = "c:"; } if ($^O =~ /linux/i) { $_TAF = "/tmp/var/www/cgi-bin"; } 
+$tcDir = "$_TAF/$tcName";
+
+
+if ($ARGV[0]) { 
+	open Fout, ">$tcDir/_tcLogAppend.txt";
+	if ($ARGV[0] == 1) { print "pass"; } # <<< plug in the test case 1 here e.g. print `index.pl 1` ; >>>
+	if ($ARGV[0] == 2) { print "pass"; } # <<< plug in the test case 2 here e.g. print `index.pl 2`>>>
+	if ($ARGV[0] == 3) { print "pass"; } # <<< plug in the test case 3 here e.g. print `index.pl 3`>>>
+	if ($ARGV[0] == 4) { print "pass"; } # <<< plug in the test case 4 here e.g. print `index.pl 4`>>>
+	if ($ARGV[0] == 5) { print "pass"; } # <<< plug in the test case 5 here e.g. print `index.pl 5`>>>
+	if ($ARGV[0] == 6) { print "pass"; } # <<< plug in the test case 6 here e.g. print `index.pl 6`>>>
+	close Fout;
+} else {
+print <<EOF;
+1. Test case description 1 for < > \$ \% @ ( ) testing the function 1 --- Please modifyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa _smoke_ _regression_
+2. Test case description 2 for testing _smoketest__regressiontest_the function 2 --- Please modifybbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb _smoke_
+3. Test case description 3 for testing _smoketest_the function 3 --- Please modifycddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd _regression_
+4. Test case description 4 for testing _regressiontest_the function 4 --- Please modify _smoke_
+5. Test case description 5 for testing _regressiontest_the function 5 --- Please modify
+6. Test case description 6 for testing the function 6 --- Please modify
+EOF
+;
+}
+
+EOF1
+;
+$str =~ s/_testsuite1_/$tcName/g;
+print Fout $str;
+close Fout;
+print " -> c:/iiiiiiii/_testsuite1_/index.pl";
+
+EOF3
+;
+
+$str =~ s/_testsuite1_/$tcName/g; 
+
+print Fout $str;
+close Fout;
+print " -> $index\n";
+EOFIndex3
+;
+
+my $fname ; 
+if ($^O =~ /win32/i) { $fname = "$_TAF/bin/indexindexindex.pl";  }
+if ($^O =~ /linux/i) { $fname = "/tmp/indexindexindex.pl";  }
+if ( -e $fname) {;} else { open Fout, ">$fname"; print Fout $str; close Fout; }
+# print " -> $fname\n";
 }
 
 
@@ -2639,6 +2924,7 @@ print Fout "* TC Log can has URL (http:///) pointed to <a href=\\"$urlHttp/index
 print Fout "* TC Log can has special characters like Dollor \\\$, Percentage \\\% AT \\\@ \\n";
 print Fout "* TC Log can display (add _url_line_ in the line) URL http://localhost$http_port   _ url_line_line	_url_line_ (_url_line_ indicates a real url. Not translation will be done.)\\n";
 print Fout "* TC Log can parse log (*.txt) in log $c/$_TAF/_testLog.txt and add its Http and File links.\\n";
+print Fout "* TC Log can parse log (*.txt) in log $c/$_TAF/_testLog.htm and add its Http and File links.\\n";
 close Fout;
 exit;
 EOF
@@ -2785,7 +3071,7 @@ close Fin;
 	if (-e $parent) {
 		open Fout1, ">$parent/thProperty.txt_"; 
 		print Fout1 $content_out; 
-		foreach my $each (sort keys %records) { print Fout1 "$records{$each}\n"; } 
+		foreach my $each (sort keys %records) {print Fout1 "$records{$each}\n"; } 
 		close Fout1;
 		&copyFile("$parent/thProperty.txt_", "$parent/thProperty.txt");
 	}
@@ -3023,6 +3309,7 @@ sub modifyProperty() { 	# modify TC Property (TH:TC Managements)
     my $cmdStr        = "delete=$propertyName";
     &deleteProperty( $tcname, $cmdStr );
     $cmdStr = "add_${propertyName}_column_${propertyValue}"; # todo
+    print "pa; addProperty\n";
     &addProperty( $tcname, $cmdStr );
     return "$propertyName is modified to $propertyValue for $tcname";
 }
@@ -3394,8 +3681,8 @@ sub setGlobalVars {
 		elsif ($varName =~ /\bPropValuePattern\b/i)  	{ $SvrPropValuePattern= $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bTestSuit\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1; $SvrProjName =~ s/\\/\//g; $SvrProjName =~ s/$c\/$_TAF\///; }
 		elsif ($varName =~ /\bTestSuite\b/i) 		{ $SvrProjName = $varValue; $foundMatch = 1; $SvrProjName =~ s/\\/\//g; $SvrProjName =~ s/$c\/$_TAF\///;}
-		elsif ($varName =~ /\bsubTestSuite\b/i) 	{ $SvrProjNameSub = $varValue; $foundMatch = 1; $SvrProjNameSub =~ s/\\/\//g; $SvrProjNameSub =~ s/$c\/$_TAF\///;}
-		elsif ($varName =~ /\bTestSuiteSub\b/i) 	{ $SvrProjNameSub = $varValue; $foundMatch = 1; $SvrProjNameSub =~ s/\\/\//g; $SvrProjNameSub =~ s/$c\/$_TAF\///;}
+		elsif ($varName =~ /\bsubTestSuite\b/i) 	{ $SvrProjNameSub = $varValue; $foundMatch = 1; $SvrProjNameSub =~ s/\\/\//g;  $SvrProjNameSub =~ s/$c\/$_TAF\///;}
+		elsif ($varName =~ /\bTestSuiteSub\b/i) 	{ $SvrProjNameSub = $varValue; $foundMatch = 1; $SvrProjNameSub =~ s/\\/\//g;  $SvrProjNameSub =~ s/$c\/$_TAF\///;}
 		elsif ($varName =~ /\bTCNameFilter\b/i) 	{ $SvrTCNamePattern = $varValue;$foundMatch = 1;}
 		elsif ($varName =~ /\bTCNameExecFilter\b/i) 	{ $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
 		elsif ($varName =~ /\bTestCaseExec\b/i) 	{ $SvrTCNameExecPattern = $varValue; $foundMatch = 1;}
@@ -3516,8 +3803,10 @@ sub setGlobalVars {
 
 sub runPowershell {
 	my $cmd = shift;  my $return; if ($cmd =~ /.ps1\s+/) { $cmd = "$cmd"; $return = `$cmd`;} else { $return = `$perl $cmd`; }
-	$return =~ s/\@/&amp;/g; $return =~ s/\%/&#37;/g; $return =~ s/\$/&#36;/g;
+	$return =~ s/&/&amp;/g; $return =~ s/\%/&#37;/g; $return =~ s/\$/&#36;/g;
  	$return =~ s/\s+<\s+/ &lt; /g; $return =~ s/\s+>\s+/ &gt; /g;			# improvement : handle < > in tcDesc
+ 	$return =~ s/\s*\(\s*/ &#40;/g; $return =~ s/\s*\)\s*/ &#41;/g;			# improvement : handle < > in tcDesc
+	$return =~ s/\|/&#166;/g;
 	if ($return =~ /^\s*$/) { $return = "Testsuite has no Testcase";}		# bug fix on 2013/09/20
 	return $return;
 }
@@ -3760,7 +4049,7 @@ if (\$ARGV[0]) {
 	close Fout;
 } else {
 print \<\<EOF;
-1. Test case description 1 for < > \\\$ \\\% @ testing the function 1 --- Please modifyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa _smoke_ _regression_
+1. Test case description 1 for | | < > \\\$ \\\% @ testing the function 1 --- Please modifyaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa _smoke_ _regression_
 2. Test case description 2 for testing _smoketest__regressiontest_the function 2 --- Please modifybbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb _smoke_
 3. Test case description 3 for testing _smoketest_the function 3 --- Please modifycddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd _regression_
 4. Test case description 4 for testing _regressiontest_the function 4 --- Please modify _smoke_
@@ -3847,13 +4136,16 @@ sub eraseTAFTestsuite {goto &deleteTAFTestsuite}
 
 sub deleteTAFTestsuite {
         my $c_ = $c; my $_TAF_ = $_TAF; my $SvrProjName_ = $SvrProjName;
-        if ($SvrProjName_ =~ /^$c_/ ) {
+        if (($SvrProjName_ =~ /^$c_/ ) || ($^O =~ /linux/i)) {
         	if ($^O =~ /win/i) { $SvrProjName_ =~ s/^$c//;}
         	my $TSDir = "$c/$_TAF/$SvrProjName_"; $TSDir =~ s/\/\//\//g;
                 if ( -e $TSDir ) {
-                        rmtree $TSDir;
+			unlink glob "$TSDir/index*.*";
+			unlink glob "$TSDir/_*";
+			# rmtree $TSDir;
                         print "Delete TAF Testsuite $TSDir\n";
-                        &generateRootIndex();
+			&generateRootIndex();
+			# &refreshHost();
                 } else {
                         print "Warning: TAF Testsuite $c_/${_TAF}$SvrProjName_ doesn't exist!\n";
                 }
@@ -3865,55 +4157,64 @@ sub deleteTAFTestsuite {
 ########### index2index
 
 sub index2index {       #### Generate subIndex from TAF-generate-index.pl       # input $tcDir, $matchStr
-
 	my $tcDir = $SvrProjName; 
 	my $matchStr = "2013.09.13"; $matchStr = shift if @_;
-
         my @tcExec_; my @tcDesc_;        my $is_tcDesc="n";  my %tcDesc_; my %tcExec_;
-        if (-e "$tcDir/index.pl") {;} else {print "Warning: There is no $tcDir/index.pl. The taf.pl exit\n"; exit; }
+        if (-e "$tcDir/index.pl") {;} else {print "Warning: There is no $tcDir/index.pl. taf.pl exits\n"; exit; }
         open Fin, "$tcDir/index.pl"; my @index = <Fin>; close Fin;
         foreach my $each (@index) {
-                if ($each =~ /ARGV\[0\]\s*==/) {
-                        $each =~ /\{(.+); print \"null\"/i;  $each = $1;
-                        $each =~ s/^\s*print\s+Fout\s+\"//g;
-                        $each =~ s/\"\s*$//g;
-                        push (@tcExec_, $each);
-                }
-                if ($each =~ /print<<EOF;/) { $is_tcDesc = 'y'; }
-                elsif ($each =~ /^EOF\b/) { $is_tcDesc = 'n'; }
-                elsif ($is_tcDesc =~ /y/i) { chop $each; push (@tcDesc_, $each);} }
+                if ($each =~ /ARGV\[0\]\s*==/) 	{ push (@tcExec_, $each); }
+                if ($each =~ /print\s*<<EOF;/) 	{ $is_tcDesc = 'y'; }
+                elsif ($each =~ /^EOF\b/) 	{ $is_tcDesc = 'n'; }
+                elsif ($is_tcDesc =~ /y/i) 	{ chop $each; 
+			push (@tcDesc_, $each);} 
+	}
 
+	my $ctrctr=1;
+	print " -> $tcDir/_tcMap.txt\n";
+	if ( -e "$tcDir/_tcMap.txt" ) { open Foutmap, ">> $tcDir/_tcMap.txt"; } else { open Foutmap, "> $tcDir/_tcMap.txt"; }
+	#for (my $i = 1; $i <= $#tcDesc_+1; $i++ )  {
         for (my $i = 0; $i <= $#tcDesc_; $i++ )  {
+		# print "pa:b $i, $tcDesc_[$i], $matchStr\n";
                 if ($tcDesc_[$i] =~ /$matchStr/i) {
+			my $tmp = $tcDir; 
+			#	$tmp =~ s/$c/$c\/$_TAF/; 
+			printf Foutmap "$tmp/testcase%04d => $tmp/$matchStr/testcase%04d\n", $i+1, $ctrctr; $ctrctr++;
                 $tcDesc_{$i} = $tcDesc_[$i];
                 $tcExec_{$i} = $tcExec_[$i];
-                }
+                } else {
+			my $tmp = $tcDir;
+			#$tmp =~ s/$c/$c\/$_TAF/; 
+			printf Foutmap "$tmp/testcase%04d => $tmp/testcase%04d\n", $i+1, $i+1;
+
+		}
         }
+	close Foutmap;
 
 if (-e "$tcDir/$matchStr") {;} else { mkpath ("$tcDir/$matchStr"); print " -dir-> $tcDir/$matchStr\n";} #### create new TS dir
 
 open INDEX , ">$tcDir/$matchStr/index.pl";
 print INDEX <<EOF;
 #!/usr/bin/perl.exe
-\$tcName = "AresPerformance";
+\$tcName = "subTestsuit";
  if (\$^O =~ /win32/i) { \$_TAF = "c:"; } if (\$^O =~ /linux/i) { \$_TAF = "/tmp/var/www/cgi-bin"; }
  \$tcDir = "\$_TAF/\$tcName";
 
  if (\$ARGV[0]) {
         open Fout, ">\$tcDir/$matchStr/_tcLogAppend.txt";
-
 EOF
-
 my $ctr = 1;
-foreach my $each ( sort keys %tcExec_) { print INDEX "if (\$ARGV[0] == ".$ctr++.") \{print Fout \"$tcExec_{$each}\\n\\\"; \\nThe results are also displayed at <a href=\\\"http://pdxnpgraph01.iovationnp.com\\\" >Graphite</a> _url_line_ \nprint \\\"null\\\"\";\}\n"; }
-
+foreach my $each ( sort keys %tcExec_) { 
+	my $tmp = $tcExec_{$each}; 	
+	$tmp =~ s/==\s*(\d+)\s*\)/== $ctr )/; $ctr++;
+	print INDEX $tmp;
+	# print INDEX $tcExec_{$each}; 
+}
 print INDEX <<EOF;
         close Fout;
         } else {
-
 EOF
 print INDEX "\nprint<<EOF;\n";
-
    $ctr = 1;
 foreach my $each (sort keys %tcDesc_) { print INDEX $ctr++.". $tcDesc_{$each}\n"; }
 
@@ -3923,12 +4224,12 @@ close INDEX;
 print " -> $tcDir/$matchStr/index.pl\n";
 }
 
-
 ########### index2index
 
 
 sub generateTAFTestsuite {goto &generateTestsuite}
 sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnvil.pl 
+ 	$performanceMode		= "fast4cmd"; 			# fast4cmd
 	my $cmd = $SvrProjName ;  $cmd = shift if @_;
 	#if ($cmd !~ /:/) { $cmd = $c.'/'.$_TAF.'/'.$cmd; }		linux
 	# This is a logic for window system (c:) if testsuite !~ c:\, it is a TAF TS under c:\_TAF\....
@@ -3958,7 +4259,6 @@ sub generateTestsuite { 						# Generating 1. index.pl 2. index.pl + index_pyAnv
 		if ($tsDriver =~ /null/i) { $tsDriver = "$cmd\/index.pl"; }	
 		&generatePerl_pl_template();
 	}								
-
 	##############################################  subroutine Main ###########################################
 	$cmd = shift if @_; my $testsuiteName="_default_testsuiteblas_"; my $testsuitePropertyFName='tsProperty.txt'; my $testDriverName = $cmd; 
 	my $tsPropertyStr = "web_ui_title: "; my $tcCtr=1; my $TAF= $SvrDrive ;
@@ -4095,7 +4395,8 @@ EOF
 			#$cmd = sprintf "$c/$_TAF/taf.pl tcDelay=0;performanceMode=fast;testcaseNode=$testcaseNode;testsuite=$testsuiteName;list"; 
 			#print "\nlist: todo> $cmd\n". `$cmd`;
 			#### !!!!!!!!!! the processTCs works !!!!!!!!!!!!!!!
-			$cmd = sprintf "tcDelay=0;testcaseNode=$testcaseNode;testsuite=$testsuiteName;list";  &processTCs("",$cmd); # todo
+			#### updateTS in stead of recreate TS $cmd = sprintf "tcDelay=0;testcaseNode=$testcaseNode;testsuite=$testsuiteName;list";  &processTCs("",$cmd); # todo
+			$cmd = sprintf "tcDelay=0;testcaseNode=$testcaseNode;testsuite=$testsuiteName;mark";  &processTCs("",$cmd); # todo
 			&generateRootIndex();
 	if ($interact =~ /\by\b/) {system ("C:/Program Files/Internet Explorer/iexplore.exe", "$c/$_TAF/$testsuiteName/index.htm");}
 
@@ -4248,8 +4549,30 @@ EOF
 	print $help;
 	&genDriver_testbed();
 	sleep $outputPause;
+
+	if (-e  "$SvrDrive/$reportHtml") { ; } else { 	# if this is the 1st time install, testbed script is started
+		print "Start  ***testbed*** ($c/$_TAF/taf.[bat|sh] for ininital installation.  Remove testbed script ($c/$_TAF/taf_delete.[bat|sh])\n";
+		system 	"$c/$_TAF/taf.bat" if ($^O =~ /win32/i);
+		system 	"$c/$_TAF/taf.sh " if ($^O =~ /linux/i);
+		print "Finish ***testbed*** ($c/$_TAF/taf.[bat|sh] for ininital installation.  Remove testbed script ($c/$_TAF/taf_delete.[bat|sh])\n";
+	}
 	1;
 }
+
+sub installTestbed {
+	print "Start  ***testbed*** ($c/$_TAF/taf.[bat|sh] for ininital installation.  Remove testbed script ($c/$_TAF/taf_delete.[bat|sh])\n";
+	system 	"$c/$_TAF/taf.bat" if ($^O =~ /win32/i);
+	system 	"$c/$_TAF/taf.sh " if ($^O =~ /linux/i);
+	print "Finish ***testbed*** ($c/$_TAF/taf.[bat|sh] for ininital installation.  Remove testbed script ($c/$_TAF/taf_delete.[bat|sh])\n";
+}
+
+sub deleteTestbed {
+	print "Start ***delete testbed*** ($c/$_TAF/taf_delete.[bat|sh].  Install testbed script ($c/$_TAF/taf.[bat|sh])\n";
+	system 	"$c/$_TAF/taf_delete.bat" if ($^O =~ /win32/i);
+	system 	"$c/$_TAF/taf_delete.sh " if ($^O =~ /linux/i);
+	print "Finish ***delete testbed*** ($c/$_TAF/taf_delete.[bat|sh]. Install  testbed script ($c/$_TAF/taf.[bat|sh])\n";
+}
+
 
 
 sub help4intro {
@@ -4574,13 +4897,15 @@ sub genDriver_taf_svr {
 
 
 sub genDriver_testbed {
-	if ($^O =~ /win32/i) { &genDriverWindow(); &delDriverWindow();}
-	if ($^O =~ /linux/i) { &genDriverLinux();  &delDriverLinux();}
+	if ($^O =~ /win32/i) { &genDriver_testbed_Window(); &delDriver_testbed_Window();}
+	if ($^O =~ /linux/i) { &genDriver_testbed_Linux();  &delDriver_testbed_Linux();}
 }
-sub genDriverWindow {	# Testbed/testbed
+sub genDriver_testbed_Window {	# Testbed/testbed
 	mkpath  "$c/$_TAF";
 	if (-e "$c/$_TAF/taf.pl") { ;} else { open Fout, ">$c/$_TAF/taf.pl"; print Fout &prDriver(1); close Fout; print " --> $c/$_TAF/taf.pl\n"; }
 	if (-e "$c/$_TAF/taf.bat") {;} else {
+
+  	&generateAutoItTS();
 
 my $testbed4Window =<<EOF;
 
@@ -4961,7 +5286,7 @@ EOF
 
 
 
-sub genDriverLinux {	# Testbed/testbed
+sub genDriver_testbed_Linux {	# Testbed/testbed
 	mkpath  "$c/$_TAF";
 	if ($^O =~ /linux/i) { `sudo /bin/chmod -R ugo+rwx $c`;}
 	if (-e "$c/$_TAF/taf.pl") { ;} else { open Fout, ">$c/$_TAF/taf.pl"; print Fout &prDriver(1); close Fout; print " --> $c/$_TAF/taf.pl\n"; }
@@ -4991,7 +5316,7 @@ my $testbed4Linux=<<EOF;
 #  * Modify 
 #  * Delete TC/TS
 #  * Update TS/TC Status
-#  * deleteTS  $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}deleteTS
+#  * deleteTS  /usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}deleteTS
 #  ------------- Create TC/TS in directory $c/$_TAF...... -----------------------------------
 
 # debug: C:/strawberry/perl/bin/perl.exe c:/_TAF/taf.pl testsuite=_testsuite1_;deleteTS
@@ -5006,183 +5331,183 @@ my $testbed4Linux=<<EOF;
 # debug /usr/bin/perl /tmp/var/www/cgi-bin/_TAF/taf.pl testsuite=/tmp/var/www/cgi-bin/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1~createTS
 
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0001/overwrite,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0002/overwrite,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0003/overwrite,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0004/overwrite,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0005/overwrite,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0006/overwrite,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0001/overwrite,sleep=20
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0002/overwrite,sleep=20
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0003/overwrite,sleep=40
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0004/overwrite,sleep=30
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0005/overwrite,sleep=20
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0006/overwrite,sleep=20
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0001/overwrite,sleep=2
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0001/overwrite,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0002/overwrite,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0003/overwrite,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0004/overwrite,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0005/overwrite,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}create=testcase0006/overwrite,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0001/overwrite,sleep=20
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0002/overwrite,sleep=20
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0003/overwrite,sleep=40
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0004/overwrite,sleep=30
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0005/overwrite,sleep=20
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}create=testcase0006/overwrite,sleep=20
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0001/overwrite,sleep=2
 #  create performance test 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0002/overwrite,perf,sleep=3
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0002/overwrite,perf,sleep=3
 #  create Failed Functional test 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0003/overwrite,fail,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0004/overwrite,sleep=2
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0005/overwrite,fail,sleep=4
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0003/overwrite,fail,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0004/overwrite,sleep=2
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0005/overwrite,fail,sleep=4
 #  create functional test /w log
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0006/overwrite,genLog,sleep=10
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0007/overwrite,fail,genLog,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0008/overwrite,pass,genLog,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0009/overwrite,expectedFail,genLog,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0010/overwrite,expF,genLog,sleep=1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0011/overwrite,bugF,genLog,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0006/overwrite,genLog,sleep=10
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0007/overwrite,fail,genLog,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0008/overwrite,pass,genLog,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0009/overwrite,expectedFail,genLog,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0010/overwrite,expF,genLog,sleep=1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}create=testcase0011/overwrite,bugF,genLog,sleep=1
 
 #  create customrized TAF test cases for property operation test (TC contents are hardcoded in TAF)
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0001/overwrite,sleep=1,customTC:taftestcase1:customTC
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0002/overwrite,sleep=1,customTC:taftestcase2:customTC
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0003/overwrite,sleep=1,customTC:taftestcase3:customTC
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0004/overwrite,sleep=1,customTC:taftestcase4:customTC
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0001/overwrite,sleep=1,customTC:taftestcase1:customTC
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0002/overwrite,sleep=1,customTC:taftestcase2:customTC
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0003/overwrite,sleep=1,customTC:taftestcase3:customTC
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}create=testcase0004/overwrite,sleep=1,customTC:taftestcase4:customTC
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}exec
 
 #  $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}printTAFTSVars
 #  $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testcase=testcase0003${deli}printTAFTCVars
 
 #  _TAF/_testsuite/TAFTSVars.txt that overwrite _TAF/TAFGlobalVARS.txt
 #  updateTAFTSVars set Execution_local_only=y
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}printTAFTSVars
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}updateTAFTSVars
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}updateTAFTCVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}printTAFTSVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}updateTAFTSVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}updateTAFTCVars
 
 #  ************ Make _testsuite1_/testcase0001 Execution_local_only (no remote exectuion)
 #  _TAF/_testsuite/TAFTSVars.txt that overwrite _TAF/TAFGlobalVARS.txt
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}printTAFTSVars
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}updateTAFTSVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}printTAFTSVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}updateTAFTSVars
 
 #  ************ Make _testsuite2_/testcase0002 Execution_local_only (no remote exectuion)
 # $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}clearTAFTCVars
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}printTAFTCVars
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}updateTAFTCVars
-#$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}list
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}printTAFTCVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testcase=testcase0002${deli}updateTAFTCVars
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}list
 
 #  exec all test_suite (testsuite~= Regexp~ testcase=RegExp)
 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testType=tc${deli}exec
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testType=tc${deli}testcase=.*${deli}exec
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testType=tc${deli}testcase=testcase.1*${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testType=tc${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testType=tc${deli}testcase=.*${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite1_${deli}testType=tc${deli}testcase=testcase.1*${deli}exec
 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testType=tc${deli}exec
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testType=tc${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite2_${deli}testType=tc${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testType=tc${deli}exec
 
 #  test execution status (1. moving symbol = test-in-prog 2. Current execution status = getWeb_ 3. delete TS
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite1_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite2_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=_testcase1_/2
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=_testcase2_/1
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=_testcase3_/3
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}getWeb_=_testcase1_
-$perl_ $c/$_TAF/taf.pl testType=tc${deli}delete=$c/$_TAF/_test_suit1_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite1_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite2_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=_testcase1_/2
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=_testcase2_/1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=_testcase3_/3
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}getWeb_=_testcase1_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testType=tc${deli}delete=$c/$_TAF/_test_suit1_
 
 #  TS Property update 
 #  *Verification* _test_suit1_ is removed from disk and webUI
 
 #  ------------- Create TC/TS in $c/_testsuite5_/...... ------
 #  generate test suite from TS Hook (index.pl)
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}createTS
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}createTS
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}createTS
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}createTS
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- generate TAF testsuite ($c/_testsuite5_/... -> $c/_TAF/_testsuite5_/...)
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}generateTAFTestsuite 
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}generateTAFTestsuite 
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}generateTAFTestsuite 
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}generateTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}generateTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}generateTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}generateTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}generateTAFTestsuite 
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  *Verification* TC_TAF $c/$_TAF/_TAF/_testsuiteTestBed/_testsuite?_ should be created and executable
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}exec
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}exec
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}exec
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}exec
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}exec
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate Perl testsuite with different tags (_smoketest_, _regression_ ) -----------------------------------
 
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}createTS
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}createTS
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}createTS
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}createTS
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}createTS
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generateTAFTestsuite
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generateTAFTestsuite
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generateTAFTestsuite
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generateTAFTestsuite
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generateTAFTestsuite
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generateTAFTestsuite
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generateTAFTestsuite
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generateTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate sub-Testsuites (_smoketest_, _regression_ ) -----------------------------------
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generatePropertyTestsuite
 
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generatePropertyTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}generatePropertyTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generatePropertyTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generatePropertyTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}generatePropertyTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate sub-Testsuies' TAF testsuite ---------------------------------------------------
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_${deli}generateTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate Summary of Original Testsuite and its TAG Testsuites by testcaseNode=_null_ ---------------------------------------------------
 
-$perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generateTAFTestsuite
-$perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}generateTAFTestsuite
+/usr/bin/sudo $perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}generateTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Create Perl-Testsuite Hook and its Test suites /w Tag-based sub-Testsuites (_smoketest_, _regression_ )
 #                   (make sure the ts ends with _powershell_, which indicate a powershell testsuite)
@@ -5194,21 +5519,21 @@ sudo chmod -R go-wx $c
 # 
 #  ------------- Update testbed' s _thProperties.txt[s] by generateRootIndex
 
-$perl_ $c/$_TAF/taf.pl printTestBedProperties${deli}generateRootIndex 
-$perl_ $c/$_TAF/taf.pl printTAFGlobalVars
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl printTestBedProperties${deli}generateRootIndex 
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl printTAFGlobalVars
 
 #  ------------- TS execution
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite1_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite2_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}testType=tc${deli}list
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=testcase0001/2
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=testcase0002/1
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=testcase0003/3
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite1_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite2_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite4_${deli}testType=tc${deli}list
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=testcase0001/2
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=testcase0002/1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite3_${deli}testType=tc${deli}updateWeb_=testcase0003/3
 
-$perl_ $c/$_TAF/taf.pl testsuit=_testsuite2_${deli}testType=tc${deli}updateWeb_=testcase0001/2
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuit=_testsuite2_${deli}testType=tc${deli}updateWeb_=testcase0001/2
 
-$perl_ $c/$_TAF/taf.pl generateRootIndex
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl generateRootIndex
 
 
 # \@start "" /b "C:/Program Files/Internet Explorer/iexplore.exe" "$c/$_TAF/_testsuite3_/index.htm"
@@ -5225,43 +5550,43 @@ $perl_ $c/$_TAF/taf.pl generateRootIndex
 # 	copy testsuites			taf.pl tsFrom=e.txt${deli}tsTo=ee.txt${deli}copyTS   
 
 #  Test the tcFilter functions
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1a_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1b_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1c_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1d_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1e_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1f_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1a_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1b_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1c_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1d_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1e_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property1_eq_value1f_doit_
 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1a_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1b_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1c_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1d_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1e_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1f_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1a_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1b_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1c_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1d_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1e_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0002${deli}propertyOp=set_property1_eq_value1f_doit_
 
 #  get TC properties 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_property1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_history_property1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_last_property1
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_latest_property1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_property1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_history_property1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_last_property1
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=get_latest_property1
 
 #  del TC properties (remove all the property-values)
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property2_eq_value2a_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=del_property2_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=set_property2_eq_value2a_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=del_property2_doit_
 
 #  Modify TC properties (same as add properties - append to thProperty.txt)
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=modify_property3_eq_value3f_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=modify_property3_eq_value3f_doit_
 
 #  print TS/TC tcFilters 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}printTCFilters		
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}printTCFilters
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}printTCFilters		
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}printTCFilters
 
 #  property match (might need regExp in the future)
 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=match_property2_as_value1h_doit_
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=match_property1_as_value1h_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=match_property2_as_value1h_doit_
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}testcase=testcase0001${deli}propertyOp=match_property1_as_value1h_doit_
 
-$perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}printTCFilters
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=_testsuite3_${deli}printTCFilters
 
 # *Technology Reserve* $c/$_TAF/taf.pl testsuite=_testsuite6_${deli}NofTCinTSTemplate${deli}createTS   	##### createTS with different number of TC
 
@@ -5293,7 +5618,7 @@ EOF
 	open Fout, ">$c/$_TAF/taf.txt"; print Fout $testbed4Linux; close Fout; print " --> $c/$_TAF/taf.txt\n"; my $cmd = "$c/$_TAF/taf.txt"; 
 	open Fout, ">$c/$_TAF/taf.sh" ; print Fout $testbed4Linux; close Fout; print " --> $c/$_TAF/taf.sh\n";     $cmd = "$c/$_TAF/taf.sh"; 
 
-	if ($^O =~ /linux/i) { `sudo /bin/chmod -R ugo+rwx $c`;}
+	if ($^O =~ /linux/i) { `/usr/bin/sudo /bin/chmod -R ugo+rwx $c`;}
 	if ($^O =~ /linux/i) { print "Please exec $cmd manually\n";} }
 
 
@@ -5302,9 +5627,108 @@ EOF
 
 ##############
 
-sub delDriverWindow {	# Testbed/testbed
+
+sub generateAutoItTS {
+
+	if (-e "c:/AutoItTestsuite") {;} else { mkpath "c:/AutoItTestsuite";}
+
+my $calcTestsuite=<<'EOF'
+
+;
+; AutoIt Version: 3.0
+; Language: English
+; Platform: Win9x/NT
+;
+; Script Function:
+; Plays with the calculator.
+;
+; ##################################################
+; Setup step: read var1 and var2 from command line arguments 
+;           : generate the test log as _tcLogAppend.txt
+; ##################################################
+dim $var1
+dim $var2 
+$var1 = $CmdLine[1] 
+$var2 = $CmdLine[2]
+
+Local $file = FileOpen("c:/autoItTestsuite/_tcLogAppend.txt", 1)
+
+If $file = -1 Then
+    MsgBox(0, "Error", "Unable to open file.")
+    Exit
+EndIf
+
+; ##################################################
+; Execution step: start calc and type $var1 and $var2  
+; ##################################################
+Run("calc.exe")
+
+WinWaitActive("Calculator")
+
+AutoItSetOption("SendKeyDelay", 400)
+Send($var1&"*"&$var2&"=")
+
+; Log what is typed for debugging 
+FileWrite($file, "Input :"& $var1 &"*"& $var2 & @CRLF)
+; ##################################################
+; Execution step: capture output from the calculator
+; ##################################################
+Local $output = WinGetText("[CLASS:CalcFrame]", "")
+Sleep(1000)
+FileWrite($file, "output:"&$output & @CRLF)
+
+WinClose("Calculator")
+WinWaitClose("Calculator")
+FileClose($file)
+
+; ##################################################
+; Verification step: $var1 * $var2 = $output
+; ##################################################
+;Verification    if $output = 1024 then print Pass 
+if $output = ($var1 * $var2) then
+ConsoleWrite("pass")
+else
+ConsoleWrite("fail")
+endif
+
+EOF
+;
+
+my $index_pl=<<'EOF1'
+#!C:/strawberry/perl/bin/perl.exe
+$tcName = "AutoItTestsuite";
+if ($^O =~ /win32/i) { $_TAF = "c:"; } if ($^O =~ /linux/i) { $_TAF = "/tmp/var/www/cgi-bin"; } 
+$tcDir = "$_TAF/$tcName";
+
+
+if ($ARGV[0]) { 
+	open Fout, ">$tcDir/_tcLogAppend.txt";
+	if ($ARGV[0] == 1) { print &testcase(5  , 6  );}
+	if ($ARGV[0] == 2) { print &testcase(5.5, 6  );} 
+	if ($ARGV[0] == 3) { print &testcase(5.5, 6.5);} 
+	if ($ARGV[0] == 4) { print &testcase(5.5, 0  );} 
+	close Fout;
+} else {
+print <<EOF;
+1. Test case 1: inteter * integer ( 5   * 6  )
+2. Test case 2: float   * integer ( 5.5 * 6  )
+3. Test case 3: float   * float   ( 5.5 * 6.5)
+4. Test case 4: float   * zero    ( 5.5 * 0  )
+EOF
+;
+}
+
+sub testcase { my $cmd = "\"C:/Program Files (x86)/AutoIt3/AutoIt3\" c:/AutoItTestsuite/calc.au3 $_[0] $_[1]"; return `$cmd`; }
+EOF1
+;
+
+open Fout, ">c:/AutoItTestsuite/calc.au3"; print Fout $calcTestsuite; close Fout;
+open Fout, ">c:/AutoItTestsuite/index.pl"; print Fout $index_pl; close Fout;
+}
+
+sub delDriver_testbed_Window {	# Testbed/testbed
 #here 	if ($workingDir =~ /\w+:[\/|\\]\s*$/) { print 'Please do *NOT* run perl -MTest::AutomationFramework -e "install" from rootDir. Run it from non-root directory.'; exit}
-	if ( -e "$c/$_TAF") {;} else { mkpath  "$c/$_TAF"; }
+	if (-e "$c/$_TAF") {;} else { mkpath  "$c/$_TAF"; }
 	if (-e "$c/$_TAF/taf.pl") { ;} else { open Fout, ">$c/$_TAF/taf.pl"; print Fout &prDriver(1); close Fout; print " --> $c/$_TAF/taf.pl\n"; }
 	if (-e "$c/$_TAF/taf_delete.bat") {;} else {
 
@@ -5436,6 +5860,8 @@ $perl_ $c/$_TAF/taf.pl printTestBedProperties${deli}generateRootIndex
 
 $perl_ $c/$_TAF/taf.pl generateRootIndex
 
+taf.pl refreshHost
+taf.pl testsuite=c:/_testsuite10_;refreshHost
 
 EOF
 
@@ -5454,109 +5880,112 @@ EOF
 
 
 
-sub delDriverLinux {	# Testbed/testbed
-	if ( -e "$c/$_TAF") {;} else { mkpath  "$c/$_TAF"; }
-	if ($^O =~ /linux/i) { `sudo /bin/chmod -R ugo+rwx $c`;}
-	if (-e "$c/$_TAF/taf.pl") { ;} else { open Fout, ">$c/$_TAF/taf.pl"; print Fout &prDriver(1); close Fout; print " --> $c/$_TAF/taf.pl\n"; }
-	if (-e "$c/$_TAF/taf_delete.sh") {;} else {
+sub delDriver_testbed_Linux {	# Testbed/testbed
+	if ( -e "$c/$_TAF") 			{;} else { mkpath  "$c/$_TAF"; }
+	if ($^O =~ /linux/i) 			{`/usr/bin/sudo /bin/chmod -R ugo+rwx $c`;}
+	if (-e "$c/$_TAF/taf.pl") 		{;} else { open Fout, ">$c/$_TAF/taf.pl"; print Fout &prDriver(1); close Fout; print " --> $c/$_TAF/taf.pl\n"; }
+	if (-e "$c/$_TAF/taf_delete.sh") 	{;} else {
 
 my $testbed4Linux=<<EOF;
 
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite1_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite2_${deli}deleteTAFTestsuite
-rem $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite3_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite4_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite1_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite2_${deli}deleteTAFTestsuite
+rem /usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite3_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite4_${deli}deleteTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Create TC/TS in $c/_testsuite5_/...... ------
 #  generate test suite from TS Hook (index.pl)
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}deleteTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- generate TAF testsuite ($c/_testsuite5_/... -> $c/_TAF/_testsuite5_/...)
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}deleteTAFTestsuite 
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}deleteTAFTestsuite 
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}deleteTAFTestsuite 
-#$perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}deleteTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite1_/_TS1${deli}deleteTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite2_/_TS1${deli}deleteTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite3_/_TS1${deli}deleteTAFTestsuite 
+#/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_testsuite5_non_TAF_/_testsuiteTestBed/_testsuite4_/_TS1${deli}deleteTAFTestsuite 
 
 #  ------------- Generate Perl testsuite with different tags (_smoketest_, _regression_ ) -----------------------------------
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate sub-Testsuites (_smoketest_, _regression_ ) -----------------------------------
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
 
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl${deli}deleteTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl${deli}deleteTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate sub-Testsuies' TAF testsuite ---------------------------------------------------
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites3_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
 
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
-$perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_full_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_full_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_smoketest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_smoketest_${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/$_TAF/taf.pl tcPropertyName=_regressiontest_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites4_/_testsuite_pl/_regressiontest_${deli}deleteTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
 
 #  ------------- Generate Summary of Original Testsuite and its TAG Testsuites by testcaseNode=_null_ ---------------------------------------------------
 
-$perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
-$perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites1_/_testsuite_pl${deli}deleteTAFTestsuite
+/usr/bin/sudo $perl_ $c/_TAF/taf.pl testcaseNode=_null_${deli}testsuite=$c/_perlTestsuite_/AppBuildpath/_automated_testsuites2_/_testsuite_pl${deli}deleteTAFTestsuite
 
-sudo chmod -R ugo+rwx $c
-sudo chmod -R go-wx $c
+/usr/bin/sudo chmod -R ugo+rwx $c
+/usr/bin/sudo chmod -R go-wx $c
+
+taf.pl refreshHost
+taf.pl testsuite=c:/_testsuite10_;refreshHost
 
 EOF
 
 	open Fout, ">$c/$_TAF/taf_delete.txt"; print Fout $testbed4Linux; close Fout; print " --> $c/$_TAF/taf_delete.txt\n"; my $cmd = "$c/$_TAF/taf_delete.txt"; 
 	open Fout, ">$c/$_TAF/taf_delete.sh" ; print Fout $testbed4Linux; close Fout; print " --> $c/$_TAF/taf_delete.sh\n";     $cmd = "$c/$_TAF/taf_delete.sh"; 
 
-	if ($^O =~ /linux/i) { `sudo /bin/chmod -R ugo+rwx $c`;}
+	if ($^O =~ /linux/i) { `/usr/bin/sudo /bin/chmod -R ugo+rwx $c`;}
 	if ($^O =~ /linux/i) { print "Please exec $cmd manually\n";} }
 
 
@@ -5625,6 +6054,17 @@ This is a demo for Log in Log (Recursive Log)
 EOF
 print Fout $str;
 close Fout; 
+
+open Fout, ">$c/$_TAF/_testLog.htm";
+$str=<<EOF;
+<html><bod><pre>
+This is a demo for *.htm in Log (Recursive Log) 
+</pre></body></html>
+EOF
+print Fout $str;
+close Fout; 
+
+
 
 	mkpath "$c/$_TAF/_testsuite3_";
 open Fout, ">$c/$_TAF/_testsuite3_/tsProperty.txt";
@@ -5786,7 +6226,9 @@ if (($tafArgs =~ /Execution_local_only=y/i) && ($tafArgs =~ /Execution_from_cgi=
 	print "This test can NOT be executed over the network. Pleae execute the test from host w-PC/192.168.0.140. To Turn ON Remote Execution, email the administrator. \n" ;
 } else {
 	my $cmd = "start c:/_TAF/taf.pl $tafArgs";
+	if ($^O =~ /win32/i) { ; } elsif ( $^O =~ /linux/i) { $cmd = "/usr/bin/perl /tmp/var/www/cgi-bin/_TAF/taf.pl $tafArgs"; }
 	print "Running at _host_/_ip_: $cmd\n";
+	print "Waiting ......\n";
 	system $cmd;
 }
 
@@ -5832,7 +6274,9 @@ print $cgi->end_html ;
  } 
  
  # start the server on port 8080
- my $pid = MyWebServer->new(8080)->background();
+ my $httpport = 8080;
+ if ($^O =~ /win32/i) {;} elsif ($^O =~ /linux/i) { $httpport = "1234"; }
+ my $pid = MyWebServer->new($httpport)->background();
  print "Use 'kill $pid' to stop server.\n";
 
 EOF
@@ -5876,6 +6320,8 @@ if (\$cmdLine) {;} else {foreach \$each (\@ARGV) {\$cmdLine =\$cmdLine.\$each.';
 # print "debug: taf: done. Please uncomment this from taf.pl\\n";
 
 exit;
+
+if (\$cmdLine =~ /releaseLock/i) { \$TAF->Queue("releaseLock"); exit;}
 if (\$cmdLine =~ /exitTAF/i)  { \$TAF->processTCs(\$cmdLine);  \$TAF->Queue("releaseLock"); } else { if (\$cmdLine) {\$TAF->Queue("push",\$cmdLine);} }
 	if (\$TAF->Queue("checkLock") > 0) { print "The task is in queue. The lock (\$c/\$_TAF/taf.lock) exist!\\n"; exit;}
 	\$TAF->Queue("setLock"); 
@@ -6147,6 +6593,18 @@ sub updateWeb_ {
  			my $tcnameTmp = $tcname;
  			if ( $_ =~ /$tcnameTmp/i) {
  				$_ =~  />(\S+)<\/marquee>/;  my $movingString_ = $1; 
+				if ($_ =~ /\s+(\S+\(s\))/) {
+					my $tmp_total_time = $1;
+					my $currentTime  = &UnixDate( "now", "%m/%d/%Y %H:%M:%S" );
+					my $tmp_perf_str = "***Start at $currentTime for $tmp_total_time***";
+					if ($scrollamount > 0) { 
+						$_ =~ s/Run Tests \(Testcase Number >=/$tmp_perf_str Run Tests \(Testcase Number >=/; 
+					} else {
+						$_ =~ s/\*\*\*.+\*\*\*//;
+					}
+				}
+
+
 				if ($movingString_) {;} else { $movingString_ = '>>'; }
  				$_ =~ s/>$movingString_<\/marquee>/>$movingString<\/marquee>/;
  				$_ =~  /scrollamount=\s*(\d+)\s*/;  my $scrollamount_ = $1; if ($scrollamount_) {;} else { $scrollamount_ = 0; }
@@ -6172,6 +6630,18 @@ sub updateWeb_ {
  		open Fin, $SvrDrive.'/'.$SvrProjName.'/'.$reportHtml_http;
  		open Fout, ">".$SvrDrive.'/'.$SvrProjName.'/'.$reportHtml_http."_";
  		while ($_ = <Fin>) {
+				if ($_ =~ /\s+(\S+\s*\(s\))/) {
+					my $tmp_total_time = $1;
+					my $currentTime  = &UnixDate( "now", "%m/%d/%Y %H:%M:%S" );
+					my $tmp_perf_str = "***Start at $currentTime for $tmp_total_time***";
+					if ($scrollamount > 0) { 
+						$_ =~ s/Run Tests \(Testcase Number >=/$tmp_perf_str Run Tests \(Testcase Number >=/; 
+					} else {
+						$_ =~ s/\*\*\*.+\*\*\*//;
+					}
+				}
+
+
  			my $tcnameTmp = $tcname;
  			if ( $_ =~ /$tcnameTmp/i) {
  				$_ =~  /scrollamount=\s*(\d+)\s*/;  my $scrollamount_ = $1; if ($scrollamount_) {;} else { $scrollamount_ = 0; }
@@ -6183,6 +6653,10 @@ sub updateWeb_ {
 				$_ =~  /(border:RED\s+\d+\s*px\s+)(DASHED|SOLID|DOTTED)"/;  my $borderstyle_= $2;  if ($borderstyle_) {;} else { $borderstyle_ = 'SOLID'; }
 				$_ =~ s/(border:RED\s+\d+\s*px\s+)$borderstyle_"/${1}${borderstyle}"/ ; 
  			} 
+
+
+
+
  				print Fout $_;
  		}
  		close Fout;
@@ -6320,6 +6794,7 @@ sub appendtoFile_ { # fname, fileContent, maxTCExecTime
 	move ($fname_, $fname);
 }
 
+
 sub appendtoFileFile_ {  	# TH:Generic Functions: append file to file (TH:Generic Functions)
     my $fname = $_[0]; my $fnameOUT = $_[1];
      if (-e $fname) {
@@ -6333,6 +6808,14 @@ sub appendtoFileFile_ {  	# TH:Generic Functions: append file to file (TH:Generi
      }
 }
 
+sub formatSeconds{ 
+my $time = shift;
+if ($time <60) { return int($time)."(s)";}
+my $hours = int ($time / 3600); $time = $time % 3600;
+my $minutes = int ($time / 60); $time = $time % 60;
+my $seconds = int ($time);
+return sprintf "%02d:%02d:%02d(s)",$hours,$minutes,$seconds;
+}
 ################################## concurrency file log ############################################
 sub getRoot   { my $string = shift; @_ = split /\\|\//, $string; 			return $_[$#_]; }	# return tc.pl
 sub getRoot_1 { my $string = shift; @_ = split /\\|\//, $string; 			return $_[$#_-1]; }	# remove tc.pl
@@ -6533,7 +7016,7 @@ sub prHtml1_strGen() {
 	if ($Execution_24_7_title =~ /n/i) { $TCCtrToolTip = sprintf "Run Test Suite (Avg Time is $testsuiteTotalExecTime)";} 
 	my $execTS 		= sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;performanceMode=fast;Execution_24_7=$Execution_24_7_title;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;exec')\" title=\"$TCCtrToolTip\"> Exec</a>");
 	my $stopTS 		= sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName exitTAFGracefullyString=exitTAF;exitTAF')\" title=\"Stop Test Execution gracefully\" >.</a>");
-	my $markTS 		= sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;performanceMode=fast;Execution_24_7=n;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;mark')\" title=\"Make the beginning of a execution by \|\"> \|</a>");
+	my $markTS 		= sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;performanceMode=fast;Execution_24_7=n;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;mark;resetLock')\" title=\"MarK the beginning of a execution by \|\"> \|</a>");
 	my $listTSUnderTest     = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;performanceMode=fast;testcaseNode=$testcaseNode;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;titleStatus=(UnderTestDontUse);list')\" title=\"Display UnderTestDontUser\">    </a>");
 	my $listTSUnderTestNull = sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;performanceMode=fast;testcaseNode=$testcaseNode;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;titleStatus=;list')\" title=\"set titleStatus to Null \">    </a>");
 	my $listTS 		= sprintf("<a href=\"${localUrl}/$SvrProjName/$reportHtml\" onClick=\"RunFile('$perl $scriptName SysDrive=$SvrDrive;performanceMode=fast;testcaseNode=$testcaseNode;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;list')\" title=\"Update webUI /o Tags (default)\">S</a>");
@@ -6617,7 +7100,7 @@ sub prHtml1_strGen_CGI() {
 	if ($Execution_24_7_title =~ /n/i) { $TCCtrToolTip = sprintf "Run Test Suite (Avg Time is $testsuiteTotalExecTime)";} 
 	my $execTS =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=Execution_from_cgi=y;Execution_local_only=$Execution_local_only;SysDrive=$SvrDrive;performanceMode=fast;Execution_24_7=$Execution_24_7_title;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;exec_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"$TCCtrToolTip\"> Exec</a>");
 	my $stopTS =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=exitTAFGracefullyString=exitTAF;exitTAF_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"Stop Test Execution gracefully\" >.</a>");
-	my $markTS =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=SysDrive=$SvrDrive;performanceMode=fast;Execution_24_7=n;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;mark_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"Make the beginning of a execution by \|\"> \|</a>");
+	my $markTS =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=SysDrive=$SvrDrive;performanceMode=fast;Execution_24_7=n;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;mark_realSemi_resetLock_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"Mark the beginning of a execution by \|\"> \|</a>");
 	my $listTSUnderTest =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=SysDrive=$SvrDrive;performanceMode=fast;testcaseNode=$testcaseNode;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;titleStatus=(UnderTestDontUse);list_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"Display (UnderTestDontUse)\">    </a>");
 	my $listTSUnderTestNull =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=SysDrive=$SvrDrive;performanceMode=fast;testcaseNode=$testcaseNode;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;titleStatus=;list_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"Set titleStatus as Null\">    </a>");
 	my $listTS =  sprintf("<a href=\"${localUrl}/${cgi_bin}$tafCGI?tafArgs=SysDrive=$SvrDrive;performanceMode=fast;testcaseNode=$testcaseNode;$tcPropertyPatternName=$tcPropertyPatternName;tcPropertyPatternPattern=$tcPropertyPatternPattern_;testsuit=$SvrProjName;testcaseNode=testcase;list_realSemi_tafRedirectory=${localUrl}/$SvrProjName/$reportHtml_http\" title=\"Update webUI /o Tags (default)\">S</a>");
@@ -6745,7 +7228,7 @@ $tmp =<<EOF;
  Step 2: Edit the Testsuite Template: $c/$SvrProjName/index.pl to add customer test suite
 EOF
 }
-
+$tsDriverStr =~ s/print\s*<</# todo: After copy-and-paste, please *delete* the white spaces in the following line to make the scrept work!\n print << /g;
 my $html =<<EOF;
 
 <font color=\"white\">
@@ -6909,13 +7392,64 @@ rem taf.pl testsuit=propertyChangedEvent;updateWeb=_testcase2_/1
 __END__
 
 #################### Todo list: Functional Requirements ################################
+# * requirement: teamware function. generate AF/AM?
+# * need to doc -processTSs listTS/deleteTSs function 
+# * listAll modified for return var in stead of print in sub (listAll_var)
+#   This is used for performance improvement 
+# Todo: queue mode and display taf.queue_active 
+# Todo: queue mode and display taf.queue
+# Todo: queue mode and display taf.sourcecode?
+# Todo: cut&paste needs modification for demo
+
+# * improvement: -help start testbed if c:\_TAF (/tmp/var/www/cgi-bin/_TAF) doesn't exist
 # * improvement: runFromGmail in prog  (test fetchmail in linux; win/linux )
-# * bug? No () in the index.pl tcDesc/special character @, too long, tab
 # * $c collision temporal solution line 6206
-# * testbed: improvement: tsProperty with combination of TreeViewLevel (local confg) need to be tested
+# * testbed taf.pl testsuite=c:\_testsuite10_;refreshTS (need c:\ and test on linux)
+# * testbed taf.pl refreshHost/refreshTS (need c:\ and test on linux)
+
+# * testbed improvement: tsProperty with combination of TreeViewLevel (local confg) need to be tested
 # * Testbed improvement: _thProperty_link.txt 
 # * Testbed improvement: _noShow_
+# * testbed improvement: subTestsuite 
+# * testbed improvement: mark-resetLock 
+# * testbed taf.pl releaseLock
+
+# * improvement (mouse=over has starting time )				-done 12/03/2013	
+# * bug fix: addHtml to take care of ^M ^H chars <a </a> _ws_..		-     11/26/2013	<- reopened
+# * bug: taf.svr  for linux. perl /.../taf.pl $cgiargs			-done 12/02/2013
+# * bug; taf.svr should be platform independent : linux prt 1234/ 8080 	-done 11/27/2013
+# * improvement: _cmd_line_ | -runAsCmd   won't add URLs 		-done 11/26/2013
+# * bug fix: addHtml to take care of ^M ^H chars			-done 11/26/2013	
+# * improvement: run testbed for the initial install			-done 11/25/2013
+# * improvement: add /usr/bin/sudo to the linux test bed script		-done 11/25/2013
+# * improvement: genDriverLinux -> genDriver_testbed_Linux 		-done 11/25/2013
+# * bug fix: tcDesc can't have ( and ). generateTAFTestsuite will fail  -done 11/20/2013
+# * bug fix: deleteTAFTestsuite deletes its sub-TS			-done 11/20/2013 
+# * improvement : performanceMode="fast4cmd" in generateTAFTestsuite	-done 11/14/2013
+# * improvement : add currentTime to the Processing 			-done 11/13/2013	<- Reverse broke pass/fail history info
+# * Update TS should not mask previous Logs using mark (instead of list)-done 11/11/2013	<- Reopened (The tcLog.html get removed ?) 
+# * log in log need to add <pre> </pre>  sub addHtml			-done 11/11/2013
+# * add resetLock to "mark" operation					-done 11/10/2013
+# -----------------------------------------------------------------------done 09/30/2013
+# * requirement: sub Test suite/ Testsuite _tcMap.txt (index2index?) 	-done 11/10/2013
+# taf.pl testsuite=c:/aaaa;createTS					................
+# taf.pl testsuite=c:\aaaa;generateTAFTestsuite				................
+# taf.pl testsuite=c:\aaaa;subTestsuite=_smoketest_;generateTAFTestsuite ...............
+# taf.pl testsuite=c:\aaaa\_smoketest_;generateTAFTestsuite		................
+# -----------------------------------------------------------------------done 09/30/2013
+# * taf.pl releaseLock will del taf.lock and keep taf.queue		-done 11/09/2013
+# * bug? No () in the index.pl tcDesc/special character @, too long, \t -nbug 11/07/2013
+# * research: use stop TS to run several TCs. The idea works!!!!	-done 11/07/2013
+# * bug : tcDesc can't has "|". It is treated as a pipeline		-done 11/07/2013
+# * bug fix: @ is displayed as &  fix in sub runPowershell {		-done 11/06/2013
+# * bug fix: print<< truncate the file in linux. Fix in line 7062	-done 11/06/2013
+# * bug fix: printTAFGlobalVariables line 189 				-done 11/06/2013
 # * bug: One text link per line. need extra space at the line 1426 tail 
+# * add sub formatSeconds();	fix related bug				-done 11/03/2013
+# * addURLs to parse c:\....htm		c:\_TAF\_testLog.htm		-done 11/01/2013
+# * bug fix line 1328	currentTime has type				-done 10/30/2013
+# * add createTS  /  generateIndexIndexIndex.pl				-done 10/29/2013
+# * add &generateAutoItTS() to the window test bed			-done 10/26/2013
 # * bug: fix the powershell bug (generateTAFTestsuite)*test*on linux    -done 10/26/2013
 # * taf.svr uses hostname and ip dynamically				-done 12/26/2013
 # * bug: the TC exec time is too small (null time shoul not be counted 	-done 10/26/2013
@@ -7036,7 +7570,7 @@ __END__
 # * bug: cmdline var=; var=""                                   	-done 05/12/2013
 # * minor bug _full_ (need to retest) removeTags 			-done 05/12/2013
 # * improve &tsTags : taf.pl testsuite=c:\io....;tsTags			-done 05/10/2013
-# * improvement: c:\_TAF\taf.pl testsuite=c:/iovation/pdxnpywang02/Service;readTCDesc -done 05/10/2013
+# * improvement: c:\_TAF\taf.pl testsuite=c:/iiiiiiii/pdxnpywang02/Service;readTCDesc -done 05/10/2013
 # * bug: 1st execution have undefined $fileText line 1666  		-done 05/06/2013
 # * Test: TS=4, TC=1 (20s) 1 (20s)                                   	-done 05/02/2013
 # * Test: TS=4, TC=1,2,1,2,3,4  /w lock (tc1 = 20sec)			-done 05/02/2013
